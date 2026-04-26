@@ -19,7 +19,7 @@ class DiscoverRepositoryImpl implements DiscoverRepository {
     if (groupIds.isNotEmpty) {
       query['group_ids'] = groupIds.join(',');
     }
-    final raw = await _api.get('/api/feed', query: query);
+    final raw = await _api.get('/api/discover', query: query);
     final list = decodeJsonList(raw);
     return list.map((e) => _mapItem(e as Map<String, dynamic>)).toList();
   }
@@ -32,7 +32,6 @@ class DiscoverRepositoryImpl implements DiscoverRepository {
         DiscoverFilter.projects => 'projects',
         DiscoverFilter.readings => 'readings',
         DiscoverFilter.notices => 'notices',
-        DiscoverFilter.posts => 'posts',
       };
 
   static DiscoverItem _mapItem(Map<String, dynamic> j) {
@@ -45,13 +44,12 @@ class DiscoverRepositoryImpl implements DiscoverRepository {
       metaPrimary: j['meta_primary'] as String,
       metaSecondary: j['meta_secondary'] as String,
       referenceId: j['reference_id'].toString(),
-      publishScope: (j['publish_scope'] ?? '').toString(),
+      publishScope: (j['publish_scope'] ?? 'all').toString(),
       publishGroupId: j['publish_group_id']?.toString(),
     );
   }
 
   static DiscoverKind _parseKind(String s) => switch (s) {
-        'post' => DiscoverKind.post,
         'internship' => DiscoverKind.opportunity,
         'opportunity' => DiscoverKind.opportunity,
         'event' => DiscoverKind.event,

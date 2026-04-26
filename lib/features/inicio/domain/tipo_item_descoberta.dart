@@ -1,5 +1,4 @@
 enum DiscoverKind {
-  post,
   opportunity,
   event,
   studyGroup,

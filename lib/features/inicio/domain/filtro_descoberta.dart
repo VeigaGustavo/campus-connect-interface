@@ -6,7 +6,6 @@ enum DiscoverFilter {
   projects,
   readings,
   notices,
-  posts,
 }
 
 extension DiscoverFilterX on DiscoverFilter {
@@ -18,6 +17,5 @@ extension DiscoverFilterX on DiscoverFilter {
     DiscoverFilter.projects => 'Projetos',
     DiscoverFilter.readings => 'Leituras',
     DiscoverFilter.notices => 'Avisos',
-    DiscoverFilter.posts => 'Posts',
   };
 }
