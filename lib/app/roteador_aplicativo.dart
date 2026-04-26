@@ -2,6 +2,7 @@ import 'package:campus_connect_interface/core/autenticacao/sessao_local.dart';
 import 'package:campus_connect_interface/features/autenticacao/presentation/tela_login.dart';
 import 'package:campus_connect_interface/features/autenticacao/presentation/tela_criacao_perfil.dart';
 import 'package:campus_connect_interface/features/eventos/presentation/tela_lista_eventos.dart';
+import 'package:campus_connect_interface/features/feed/presentation/tela_detalhe_post_feed.dart';
 import 'package:campus_connect_interface/features/grupos/presentation/tela_grupos.dart';
 import 'package:campus_connect_interface/features/inicio/presentation/tela_inicio.dart';
 import 'package:campus_connect_interface/features/oportunidades/presentation/tela_detalhe_oportunidade.dart';
@@ -100,6 +101,14 @@ GoRouter createAppRouter() {
         path: '/events',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const EventsListScreen(),
+      ),
+      GoRoute(
+        path: '/feed/posts/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return FeedPostDetailScreen(postId: id);
+        },
       ),
     ],
   );

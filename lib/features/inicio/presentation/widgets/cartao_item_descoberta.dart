@@ -156,6 +156,11 @@ class DiscoverCard extends StatelessWidget {
   }
 
   (Color, IconData, String) _tagFor(DiscoverKind k) => switch (k) {
+    DiscoverKind.post => (
+      AppColors.primary,
+      Icons.forum_outlined,
+      'Posts',
+    ),
     DiscoverKind.opportunity => (
       AppColors.tagInternship,
       Icons.work_outline_rounded,

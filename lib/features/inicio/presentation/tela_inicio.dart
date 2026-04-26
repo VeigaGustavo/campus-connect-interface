@@ -67,11 +67,15 @@ class _HomeScreenState extends State<HomeScreen> {
       DiscoverFilter.projects => item.kind == DiscoverKind.project,
       DiscoverFilter.readings => item.kind == DiscoverKind.reading,
       DiscoverFilter.notices => item.kind == DiscoverKind.notice,
+      DiscoverFilter.posts => item.kind == DiscoverKind.post,
     };
   }
 
   void _onDiscoverTap(DiscoverItem item) {
     switch (item.kind) {
+      case DiscoverKind.post:
+        context.push('/feed/posts/${Uri.encodeComponent(item.referenceId)}');
+        return;
       case DiscoverKind.opportunity:
         context.push('/opportunity/${Uri.encodeComponent(item.referenceId)}');
         return;

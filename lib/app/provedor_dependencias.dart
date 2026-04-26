@@ -3,6 +3,8 @@ import 'package:campus_connect_interface/core/rede/contratos_conteudo.dart';
 import 'package:campus_connect_interface/core/rede/cliente_http_campus.dart';
 import 'package:campus_connect_interface/features/eventos/data/implementacao_repositorio_eventos.dart';
 import 'package:campus_connect_interface/features/eventos/domain/repositorio_eventos.dart';
+import 'package:campus_connect_interface/features/feed/data/implementacao_repositorio_feed_posts.dart';
+import 'package:campus_connect_interface/features/feed/domain/repositorio_feed_posts.dart';
 import 'package:campus_connect_interface/features/grupos/data/implementacao_repositorio_grupos.dart';
 import 'package:campus_connect_interface/features/grupos/domain/repositorio_grupos.dart';
 import 'package:campus_connect_interface/features/inicio/data/implementacao_repositorio_descobertas.dart';
@@ -26,6 +28,7 @@ class CampusDependencies {
       opportunitiesRepository: OpportunitiesRepositoryImpl(client),
       eventsRepository: EventsRepositoryImpl(client),
       groupsRepository: GroupsRepositoryImpl(client),
+      feedPostsRepository: FeedPostsRepositoryImpl(client),
       profileRepository: ProfileRepositoryImpl(client),
       readingRepository: ReadingRepositoryImpl(client),
     );
@@ -38,6 +41,7 @@ class CampusDependencies {
     required this.opportunitiesRepository,
     required this.eventsRepository,
     required this.groupsRepository,
+    required this.feedPostsRepository,
     required this.profileRepository,
     required this.readingRepository,
   });
@@ -48,6 +52,7 @@ class CampusDependencies {
   final OpportunitiesRepository opportunitiesRepository;
   final EventsRepository eventsRepository;
   final GroupsRepository groupsRepository;
+  final FeedPostsRepository feedPostsRepository;
   final ProfileRepository profileRepository;
   final ReadingRepository readingRepository;
 }
