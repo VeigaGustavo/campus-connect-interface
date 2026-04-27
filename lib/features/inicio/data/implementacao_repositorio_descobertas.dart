@@ -19,7 +19,7 @@ class DiscoverRepositoryImpl implements DiscoverRepository {
     if (groupIds.isNotEmpty) {
       query['group_ids'] = groupIds.join(',');
     }
-    final raw = await _api.get('/api/discover', query: query);
+    final raw = await _api.get('/api/feed', query: query);
     final list = decodeJsonList(raw);
     return list.map((e) => _mapItem(e as Map<String, dynamic>)).toList();
   }
@@ -57,6 +57,6 @@ class DiscoverRepositoryImpl implements DiscoverRepository {
         'project' => DiscoverKind.project,
         'reading' => DiscoverKind.reading,
         'notice' => DiscoverKind.notice,
-        _ => throw FormatException('kind discover desconhecido: $s'),
+        _ => throw FormatException('kind feed desconhecido: $s'),
       };
 }
