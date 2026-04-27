@@ -13,7 +13,7 @@ class OpportunitiesRepositoryImpl implements OpportunitiesRepository {
   @override
   Future<List<Opportunity>> listOpportunities({String? query}) async {
     final raw = await _api.get('/api/opportunities');
-    final list = decodeJsonList(raw);
+    final list = decodeJsonListEnvelope(raw);
     var mapped =
         list.map((e) => _mapOpportunity(e as Map<String, dynamic>)).toList();
     final q = query?.trim().toLowerCase();

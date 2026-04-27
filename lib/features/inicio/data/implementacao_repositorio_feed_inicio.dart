@@ -20,7 +20,7 @@ class HomeFeedRepositoryImpl implements HomeFeedRepository {
       query['group_ids'] = groupIds.join(',');
     }
     final raw = await _api.get('/api/feed', query: query);
-    final list = decodeJsonList(raw);
+    final list = decodeJsonListEnvelope(raw);
     return list.map((e) => _mapItem(e as Map<String, dynamic>)).toList();
   }
 

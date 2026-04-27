@@ -21,15 +21,23 @@ class _HomeScreenState extends State<HomeScreen> {
   List<HomeFeedItem> _items = [];
   bool _loading = true;
   String _query = '';
+  bool _initialLoadScheduled = false;
   static const _myGroupIds = <String>['grp-001', 'grp-002'];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
     _search.addListener(() {
       setState(() => _query = _search.text.trim().toLowerCase());
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialLoadScheduled) return;
+    _initialLoadScheduled = true;
+    _load();
   }
 
   @override
@@ -40,13 +48,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final repo = DependencyScope.of(context).homeFeedRepository;
-    final items = await repo.loadFeed(_filter, groupIds: _myGroupIds);
-    if (!mounted) return;
-    setState(() {
-      _items = items;
-      _loading = false;
-    });
+    try {
+      final repo = DependencyScope.of(context).homeFeedRepository;
+      final items = await repo.loadFeed(_filter, groupIds: _myGroupIds);
+      if (!mounted) return;
+      setState(() => _items = items);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _items = []);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   List<HomeFeedItem> get _visible {

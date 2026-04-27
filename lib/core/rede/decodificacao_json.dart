@@ -7,6 +7,35 @@ List<dynamic> decodeJsonList(dynamic decoded) {
   throw const FormatException('JSON inválido: esperado lista ou campo items');
 }
 
+/// Lista na raiz ou dentro de chaves comuns (`items`, `data`, `opportunities`, …).
+/// `null` ou objeto sem lista conhecida → lista vazia (telas de listagem).
+List<dynamic> decodeJsonListEnvelope(dynamic decoded) {
+  if (decoded == null) return const [];
+  if (decoded is List<dynamic>) return decoded;
+  if (decoded is Map<String, dynamic>) {
+    const keys = <String>[
+      'items',
+      'data',
+      'results',
+      'content',
+      'records',
+      'opportunities',
+      'feed',
+      'cards',
+      'rows',
+      'history',
+    ];
+    for (final k in keys) {
+      final v = decoded[k];
+      if (v is List<dynamic>) return v;
+    }
+    return const [];
+  }
+  throw const FormatException(
+    'JSON: esperado lista ou objeto com lista (items, data, …).',
+  );
+}
+
 Map<String, dynamic> decodeJsonObject(dynamic decoded) {
   if (decoded is Map<String, dynamic>) return decoded;
   throw const FormatException('JSON inválido: esperado objeto');

@@ -19,12 +19,20 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
   final _search = TextEditingController();
   List<Opportunity> _items = [];
   bool _loading = true;
+  bool _initialLoadScheduled = false;
 
   @override
   void initState() {
     super.initState();
     _search.addListener(_reload);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialLoadScheduled) return;
+    _initialLoadScheduled = true;
+    _reload();
   }
 
   @override
@@ -36,15 +44,19 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
 
   Future<void> _reload() async {
     setState(() => _loading = true);
-    final repo = DependencyScope.of(context).opportunitiesRepository;
-    final list = await repo.listOpportunities(
-      query: _search.text.isEmpty ? null : _search.text,
-    );
-    if (!mounted) return;
-    setState(() {
-      _items = list;
-      _loading = false;
-    });
+    try {
+      final repo = DependencyScope.of(context).opportunitiesRepository;
+      final list = await repo.listOpportunities(
+        query: _search.text.isEmpty ? null : _search.text,
+      );
+      if (!mounted) return;
+      setState(() => _items = list);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _items = []);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
