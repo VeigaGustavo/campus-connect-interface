@@ -54,10 +54,33 @@ class ProfileRepositoryImpl implements ProfileRepository {
     if (raw == null) {
       return const [];
     }
-    final list = decodeJsonList(raw);
+    final list = _decodeHistoryPayload(raw);
     return list
         .map((e) => _mapHistoryItem(e as Map<String, dynamic>))
         .toList(growable: false);
+  }
+
+  /// Aceita lista JSON, `{ "items": [...] }` ou envelopes usuais (`data`, `history`, …).
+  /// Objeto sem lista conhecida vira lista vazia (evita derrubar o perfil).
+  static List<dynamic> _decodeHistoryPayload(dynamic raw) {
+    if (raw is List<dynamic>) return raw;
+    if (raw is Map<String, dynamic>) {
+      const keys = <String>[
+        'items',
+        'data',
+        'results',
+        'history',
+        'records',
+      ];
+      for (final k in keys) {
+        final v = raw[k];
+        if (v is List<dynamic>) return v;
+      }
+      return const [];
+    }
+    throw FormatException(
+      'Historico: esperado lista ou objeto com lista (ex.: items).',
+    );
   }
 
   static UserProfile _mapProfile(Map<String, dynamic> j) {
