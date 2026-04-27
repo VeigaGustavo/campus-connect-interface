@@ -1,13 +1,13 @@
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
-import 'package:campus_connect_interface/features/inicio/domain/item_descoberta.dart';
-import 'package:campus_connect_interface/features/inicio/domain/tipo_item_descoberta.dart';
+import 'package:campus_connect_interface/features/inicio/domain/item_feed_inicio.dart';
+import 'package:campus_connect_interface/features/inicio/domain/tipo_item_feed_inicio.dart';
 import 'package:flutter/material.dart';
 
-class DiscoverCard extends StatelessWidget {
-  const DiscoverCard({super.key, required this.item, this.onTap});
+class HomeFeedCard extends StatelessWidget {
+  const HomeFeedCard({super.key, required this.item, this.onTap});
 
-  final DiscoverItem item;
+  final HomeFeedItem item;
   final VoidCallback? onTap;
 
   @override
@@ -155,36 +155,36 @@ class DiscoverCard extends StatelessWidget {
     );
   }
 
-  (Color, IconData, String) _tagFor(DiscoverKind k) => switch (k) {
-    DiscoverKind.opportunity => (
-      AppColors.tagInternship,
-      Icons.work_outline_rounded,
-      'Vagas',
-    ),
-    DiscoverKind.event => (
-      AppColors.tagEvent,
-      Icons.event_outlined,
-      'Eventos',
-    ),
-    DiscoverKind.studyGroup => (
-      AppColors.tagGroup,
-      Icons.groups_2_outlined,
-      'Grupos de Estudo',
-    ),
-    DiscoverKind.project => (
-      AppColors.tagProject,
-      Icons.lightbulb_outline_rounded,
-      'Projetos',
-    ),
-    DiscoverKind.reading => (
-      AppColors.tagReading,
-      Icons.auto_stories_outlined,
-      'Leituras',
-    ),
-    DiscoverKind.notice => (
-      AppColors.tagNotice,
-      Icons.campaign_outlined,
-      'Avisos',
-    ),
-  };
+  (Color, IconData, String) _tagFor(HomeFeedKind k) => switch (k) {
+        HomeFeedKind.opportunity => (
+            AppColors.tagInternship,
+            Icons.work_outline_rounded,
+            'Vagas',
+          ),
+        HomeFeedKind.event => (
+            AppColors.tagEvent,
+            Icons.event_outlined,
+            'Eventos',
+          ),
+        HomeFeedKind.studyGroup => (
+            AppColors.tagGroup,
+            Icons.groups_2_outlined,
+            'Grupos de Estudo',
+          ),
+        HomeFeedKind.project => (
+            AppColors.tagProject,
+            Icons.lightbulb_outline_rounded,
+            'Projetos',
+          ),
+        HomeFeedKind.reading => (
+            AppColors.tagReading,
+            Icons.auto_stories_outlined,
+            'Leituras',
+          ),
+        HomeFeedKind.notice => (
+            AppColors.tagNotice,
+            Icons.campaign_outlined,
+            'Avisos',
+          ),
+      };
 }

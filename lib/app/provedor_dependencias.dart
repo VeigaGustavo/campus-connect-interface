@@ -7,8 +7,8 @@ import 'package:campus_connect_interface/features/feed/data/implementacao_reposi
 import 'package:campus_connect_interface/features/feed/domain/repositorio_feed_posts.dart';
 import 'package:campus_connect_interface/features/grupos/data/implementacao_repositorio_grupos.dart';
 import 'package:campus_connect_interface/features/grupos/domain/repositorio_grupos.dart';
-import 'package:campus_connect_interface/features/inicio/data/implementacao_repositorio_descobertas.dart';
-import 'package:campus_connect_interface/features/inicio/domain/repositorio_descobertas.dart';
+import 'package:campus_connect_interface/features/inicio/data/implementacao_repositorio_feed_inicio.dart';
+import 'package:campus_connect_interface/features/inicio/domain/repositorio_feed_inicio.dart';
 import 'package:campus_connect_interface/features/oportunidades/data/implementacao_repositorio_oportunidades.dart';
 import 'package:campus_connect_interface/features/oportunidades/domain/repositorio_oportunidades.dart';
 import 'package:campus_connect_interface/features/perfil/data/implementacao_repositorio_perfil.dart';
@@ -24,7 +24,7 @@ class CampusDependencies {
     return CampusDependencies._(
       apiClient: client,
       currentUserRole: ApiConfig.debugUserRole,
-      discoverRepository: DiscoverRepositoryImpl(client),
+      homeFeedRepository: HomeFeedRepositoryImpl(client),
       opportunitiesRepository: OpportunitiesRepositoryImpl(client),
       eventsRepository: EventsRepositoryImpl(client),
       groupsRepository: GroupsRepositoryImpl(client),
@@ -37,7 +37,7 @@ class CampusDependencies {
   const CampusDependencies._({
     required this.apiClient,
     required this.currentUserRole,
-    required this.discoverRepository,
+    required this.homeFeedRepository,
     required this.opportunitiesRepository,
     required this.eventsRepository,
     required this.groupsRepository,
@@ -48,7 +48,7 @@ class CampusDependencies {
 
   final CampusApiClient apiClient;
   final AppUserRole currentUserRole;
-  final DiscoverRepository discoverRepository;
+  final HomeFeedRepository homeFeedRepository;
   final OpportunitiesRepository opportunitiesRepository;
   final EventsRepository eventsRepository;
   final GroupsRepository groupsRepository;

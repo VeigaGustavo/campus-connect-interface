@@ -1,4 +1,4 @@
-enum DiscoverKind {
+enum HomeFeedKind {
   opportunity,
   event,
   studyGroup,

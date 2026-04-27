@@ -1,10 +1,10 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/barra_pesquisa_campus.dart';
-import 'package:campus_connect_interface/features/inicio/domain/filtro_descoberta.dart';
-import 'package:campus_connect_interface/features/inicio/domain/item_descoberta.dart';
-import 'package:campus_connect_interface/features/inicio/domain/tipo_item_descoberta.dart';
-import 'package:campus_connect_interface/features/inicio/presentation/widgets/cartao_item_descoberta.dart';
+import 'package:campus_connect_interface/features/inicio/domain/filtro_feed_inicio.dart';
+import 'package:campus_connect_interface/features/inicio/domain/item_feed_inicio.dart';
+import 'package:campus_connect_interface/features/inicio/domain/tipo_item_feed_inicio.dart';
+import 'package:campus_connect_interface/features/inicio/presentation/widgets/cartao_item_feed_inicio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -16,9 +16,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  DiscoverFilter _filter = DiscoverFilter.all;
+  HomeFeedFilter _filter = HomeFeedFilter.all;
   final _search = TextEditingController();
-  List<DiscoverItem> _items = [];
+  List<HomeFeedItem> _items = [];
   bool _loading = true;
   String _query = '';
   static const _myGroupIds = <String>['grp-001', 'grp-002'];
@@ -40,8 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final repo = DependencyScope.of(context).discoverRepository;
-    final items = await repo.getDiscoverFeed(_filter, groupIds: _myGroupIds);
+    final repo = DependencyScope.of(context).homeFeedRepository;
+    final items = await repo.loadFeed(_filter, groupIds: _myGroupIds);
     if (!mounted) return;
     setState(() {
       _items = items;
@@ -49,43 +49,30 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<DiscoverItem> get _visible {
-    final byFilter = _items.where((e) => _matchesFilter(e, _filter)).toList();
-    if (_query.isEmpty) return byFilter;
-    return byFilter.where((e) {
+  List<HomeFeedItem> get _visible {
+    if (_query.isEmpty) return _items;
+    return _items.where((e) {
       final t = '${e.title} ${e.subtitle} ${e.excerpt}'.toLowerCase();
       return t.contains(_query);
     }).toList();
   }
 
-  bool _matchesFilter(DiscoverItem item, DiscoverFilter filter) {
-    return switch (filter) {
-      DiscoverFilter.all => true,
-      DiscoverFilter.opportunities => item.kind == DiscoverKind.opportunity,
-      DiscoverFilter.events => item.kind == DiscoverKind.event,
-      DiscoverFilter.groups => item.kind == DiscoverKind.studyGroup,
-      DiscoverFilter.projects => item.kind == DiscoverKind.project,
-      DiscoverFilter.readings => item.kind == DiscoverKind.reading,
-      DiscoverFilter.notices => item.kind == DiscoverKind.notice,
-    };
-  }
-
-  void _onDiscoverTap(DiscoverItem item) {
+  void _onFeedItemTap(HomeFeedItem item) {
     switch (item.kind) {
-      case DiscoverKind.opportunity:
+      case HomeFeedKind.opportunity:
         context.push('/opportunity/${Uri.encodeComponent(item.referenceId)}');
         return;
-      case DiscoverKind.event:
+      case HomeFeedKind.event:
         context.push('/events');
         return;
-      case DiscoverKind.studyGroup:
+      case HomeFeedKind.studyGroup:
         context.go('/groups');
         return;
-      case DiscoverKind.reading:
+      case HomeFeedKind.reading:
         context.go('/reading');
         return;
-      case DiscoverKind.project:
-      case DiscoverKind.notice:
+      case HomeFeedKind.project:
+      case HomeFeedKind.notice:
         break;
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -148,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                   scrollDirection: Axis.horizontal,
-                  children: DiscoverFilter.values.map((f) {
+                  children: HomeFeedFilter.values.map((f) {
                     final selected = _filter == f;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
@@ -202,9 +189,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((context, i) {
                     final item = _visible[i];
-                    return DiscoverCard(
+                    return HomeFeedCard(
                       item: item,
-                      onTap: () => _onDiscoverTap(item),
+                      onTap: () => _onFeedItemTap(item),
                     );
                   }, childCount: _visible.length),
                 ),

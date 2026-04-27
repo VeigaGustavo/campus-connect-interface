@@ -1,7 +1,7 @@
-import 'package:campus_connect_interface/features/inicio/domain/tipo_item_descoberta.dart';
+import 'package:campus_connect_interface/features/inicio/domain/tipo_item_feed_inicio.dart';
 
-class DiscoverItem {
-  const DiscoverItem({
+class HomeFeedItem {
+  const HomeFeedItem({
     required this.id,
     required this.kind,
     required this.title,
@@ -15,7 +15,7 @@ class DiscoverItem {
   });
 
   final String id;
-  final DiscoverKind kind;
+  final HomeFeedKind kind;
   final String title;
   final String subtitle;
   final String excerpt;
