@@ -1,4 +1,5 @@
 import 'package:campus_connect_interface/core/configuracao/configuracao_api.dart';
+import 'package:campus_connect_interface/core/rede/cliente_http_log.dart';
 import 'package:campus_connect_interface/core/rede/contratos_conteudo.dart';
 import 'package:campus_connect_interface/core/rede/cliente_http_campus.dart';
 import 'package:campus_connect_interface/features/eventos/data/implementacao_repositorio_eventos.dart';
@@ -15,12 +16,17 @@ import 'package:campus_connect_interface/features/perfil/data/implementacao_repo
 import 'package:campus_connect_interface/features/perfil/domain/repositorio_perfil.dart';
 import 'package:campus_connect_interface/features/leituras/data/implementacao_repositorio_leituras.dart';
 import 'package:campus_connect_interface/features/leituras/domain/repositorio_leituras.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class CampusDependencies {
   factory CampusDependencies({CampusApiClient? apiClient}) {
-    final client =
-        apiClient ?? CampusApiClient(baseUrl: ApiConfig.baseUrl);
+    final client = apiClient ??
+        CampusApiClient(
+          baseUrl: ApiConfig.baseUrl,
+          httpClient: kDebugMode ? LoggingHttpClient(http.Client()) : null,
+        );
     return CampusDependencies._(
       apiClient: client,
       currentUserRole: ApiConfig.debugUserRole,

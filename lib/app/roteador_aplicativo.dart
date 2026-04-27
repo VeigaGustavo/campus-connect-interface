@@ -1,3 +1,4 @@
+import 'package:campus_connect_interface/app/provedor_dependencias.dart';
 import 'package:campus_connect_interface/core/autenticacao/sessao_local.dart';
 import 'package:campus_connect_interface/features/autenticacao/presentation/tela_login.dart';
 import 'package:campus_connect_interface/features/autenticacao/presentation/tela_criacao_perfil.dart';
@@ -21,7 +22,16 @@ GoRouter createAppRouter() {
     initialLocation: '/login',
     redirect: (context, state) async {
       final session = await LocalSessionStore.read();
+      if (!context.mounted) return null;
       final isLoggedIn = session != null;
+      final scope = context.getInheritedWidgetOfExactType<DependencyScope>();
+      if (scope != null) {
+        if (session != null) {
+          scope.deps.apiClient.setAccessToken(session.accessToken);
+        } else {
+          scope.deps.apiClient.clearAccessToken();
+        }
+      }
       final path = state.uri.path;
       final isAuthRoute = path == '/login' || path == '/signup';
 
