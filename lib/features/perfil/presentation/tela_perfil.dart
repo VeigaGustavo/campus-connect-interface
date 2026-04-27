@@ -15,18 +15,25 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  Future<UserProfile>? _future;
+  Future<_ProfileViewData>? _future;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _future ??= DependencyScope.of(context).profileRepository.getCurrentProfile();
+    _future ??= _loadProfileView();
   }
 
   Future<void> _reload() async {
-    final next = DependencyScope.of(context).profileRepository.getCurrentProfile();
+    final next = _loadProfileView();
     setState(() => _future = next);
     await next;
+  }
+
+  Future<_ProfileViewData> _loadProfileView() async {
+    final repo = DependencyScope.of(context).profileRepository;
+    final profile = await repo.getCurrentProfile();
+    final history = await repo.getCurrentUserHistory(limit: 20);
+    return _ProfileViewData(profile: profile, history: history);
   }
 
   Future<void> _logout() async {
@@ -41,11 +48,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: FutureBuilder<UserProfile>(
+      body: FutureBuilder<_ProfileViewData>(
         future: _future,
         builder: (context, snap) {
-          if (_future == null ||
-              snap.connectionState != ConnectionState.done) {
+          if (_future == null || snap.connectionState != ConnectionState.done) {
             return const _ProfileLoading();
           }
           if (snap.hasError) {
@@ -54,7 +60,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onRetry: _reload,
             );
           }
-          final p = snap.data!;
+          final view = snap.data!;
+          final p = view.profile;
           return RefreshIndicator(
             color: AppColors.primary,
             onRefresh: _reload,
@@ -65,10 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               slivers: [
                 SliverToBoxAdapter(
-                  child: _ProfileHeader(
-                    profile: p,
-                    onLogout: _logout,
-                  ),
+                  child: _ProfileHeader(profile: p, onLogout: _logout),
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -76,9 +80,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     delegate: SliverChildListDelegate([
                       _StatsStrip(profile: p),
                       const SizedBox(height: 14),
+                      _SummarySection(profile: p),
+                      const SizedBox(height: 14),
                       _InterestsSection(profile: p),
                       const SizedBox(height: 14),
-                      _ActivitySection(profile: p),
+                      _ActivitySection(history: view.history),
                       const SizedBox(height: 100),
                     ]),
                   ),
@@ -90,6 +96,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+}
+
+class _ProfileViewData {
+  const _ProfileViewData({required this.profile, required this.history});
+
+  final UserProfile profile;
+  final List<ProfileHistoryItem> history;
 }
 
 class _ProfileLoading extends StatelessWidget {
@@ -124,32 +137,41 @@ class _ProfileLoading extends StatelessWidget {
   }
 }
 
-class _PerformanceSeal extends StatelessWidget {
-  const _PerformanceSeal({required this.certificateLabel});
+class _CommunitySeal extends StatelessWidget {
+  const _CommunitySeal({required this.community});
 
-  final String certificateLabel;
+  final CommunityHighlight community;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       tooltip:
-          'Certificado de desempenho: $certificateLabel. Reconhecimento do '
-          'desempenho acadêmico e de participação no ecossistema campus.',
+          'Destaque de comunidade: ${community.name} '
+          '(${_communityKindLabel(community.kind)} - ${_communityRoleLabel(community.role)}).',
       onPressed: () {},
       style: IconButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
-      icon: const Icon(Icons.workspace_premium_rounded),
+      icon: const Icon(Icons.diversity_3_rounded),
     );
   }
+
+  static String _communityKindLabel(CommunityKind kind) => switch (kind) {
+    CommunityKind.athletic => 'Atletica',
+    CommunityKind.academicCenter => 'CA',
+    CommunityKind.community => 'Comunidade',
+  };
+
+  static String _communityRoleLabel(CommunityRole role) => switch (role) {
+    CommunityRole.member => 'Membro',
+    CommunityRole.director => 'Diretoria',
+    CommunityRole.president => 'Presidencia',
+  };
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({
-    required this.profile,
-    required this.onLogout,
-  });
+  const _ProfileHeader({required this.profile, required this.onLogout});
 
   final UserProfile profile;
   final Future<void> Function() onLogout;
@@ -266,11 +288,13 @@ class _ProfileHeader extends StatelessWidget {
                                   ),
                                   actions: [
                                     TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
                                       child: const Text('Cancelar'),
                                     ),
                                     FilledButton(
-                                      onPressed: () => Navigator.pop(context, true),
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
                                       child: const Text('Sair'),
                                     ),
                                   ],
@@ -321,7 +345,7 @@ class _ProfileHeader extends StatelessWidget {
                           color: AppColors.primary,
                           alignment: Alignment.center,
                           child: Text(
-                            profile.initials,
+                            _initialsFor(profile.name),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -391,12 +415,7 @@ class _ProfileHeader extends StatelessWidget {
           ],
         ),
         Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            avatarR + 18,
-            20,
-            4,
-          ),
+          padding: EdgeInsets.fromLTRB(20, avatarR + 18, 20, 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -414,18 +433,30 @@ class _ProfileHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  _PerformanceSeal(
-                    certificateLabel: profile.performanceCertificateLabel,
-                  ),
+                  if (profile.communityHighlight != null) ...[
+                    const SizedBox(width: 10),
+                    _CommunitySeal(community: profile.communityHighlight!),
+                  ],
                 ],
               ),
 
               const SizedBox(height: 8),
+              if (profile.jobTitle.trim().isNotEmpty) ...[
+                Text(
+                  profile.jobTitle,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.35,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary.withValues(alpha: 0.95),
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
               Text(
-                profile.courseAndSemester,
+                _courseSubtitle(profile),
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   height: 1.35,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary.withValues(alpha: 0.95),
@@ -436,18 +467,12 @@ class _ProfileHeader extends StatelessWidget {
                 padding: const EdgeInsets.all(14),
                 child: Column(
                   children: [
-                    _contactRow(
-                      Icons.mail_outline_rounded,
-                      profile.email,
-                    ),
+                    _contactRow(Icons.mail_outline_rounded, profile.email),
                     Divider(
                       height: 20,
                       color: AppColors.chipBorder.withValues(alpha: 0.7),
                     ),
-                    _contactRow(
-                      Icons.place_outlined,
-                      profile.cityState,
-                    ),
+                    _contactRow(Icons.place_outlined, profile.cityState),
                   ],
                 ),
               ),
@@ -456,6 +481,26 @@ class _ProfileHeader extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _courseSubtitle(UserProfile profile) {
+    final base = profile.course.trim();
+    final semester = profile.semester.trim();
+    if (base.isEmpty && semester.isEmpty) return 'Sem curso informado';
+    if (base.isEmpty) return '$semester semestre';
+    if (semester.isEmpty) return base;
+    return '$base - $semester semestre';
+  }
+
+  String _initialsFor(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList(growable: false);
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
   Widget _contactRow(IconData icon, String text) {
@@ -584,6 +629,79 @@ class _StatsStrip extends StatelessWidget {
   }
 }
 
+class _SummarySection extends StatelessWidget {
+  const _SummarySection({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.person_outline_rounded, color: AppColors.textPrimary),
+              SizedBox(width: 8),
+              Text(
+                'Sobre o perfil',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (profile.aboutMe.trim().isNotEmpty)
+            Text(
+              profile.aboutMe,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.45,
+                color: AppColors.textSecondary,
+              ),
+            )
+          else
+            Text(
+              'Sem descricao no momento.',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary.withValues(alpha: 0.9),
+              ),
+            ),
+          if (profile.institutionName.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  Icons.school_outlined,
+                  size: 18,
+                  color: AppColors.textSecondary.withValues(alpha: 0.85),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    profile.institutionName,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _InterestsSection extends StatelessWidget {
   const _InterestsSection({required this.profile});
 
@@ -597,10 +715,14 @@ class _InterestsSection extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.auto_awesome_outlined, color: AppColors.primary, size: 22),
+              Icon(
+                Icons.auto_awesome_outlined,
+                color: AppColors.primary,
+                size: 22,
+              ),
               SizedBox(width: 8),
               Text(
-                'Interesses',
+                'Preferencias',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -612,7 +734,7 @@ class _InterestsSection extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Áreas que você acompanha no feed e nas recomendações.',
+            'Gostos, topicos favoritos e especialidades do seu perfil.',
             style: TextStyle(
               fontSize: 13,
               height: 1.35,
@@ -620,34 +742,22 @@ class _InterestsSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 10,
-            children: profile.interests.map((i) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.12),
-                      AppColors.primary.withValues(alpha: 0.06),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.18),
-                  ),
-                ),
-                child: Text(
-                  i.label,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              );
-            }).toList(),
+          _TopicGroup(
+            title: 'Interesses',
+            items: profile.interests,
+            tint: AppColors.primary,
+          ),
+          const SizedBox(height: 12),
+          _TopicGroup(
+            title: 'Topicos favoritos',
+            items: profile.favoriteTopics,
+            tint: const Color(0xFF0EA5E9),
+          ),
+          const SizedBox(height: 12),
+          _TopicGroup(
+            title: 'Especialidades',
+            items: profile.specialties,
+            tint: const Color(0xFF059669),
           ),
         ],
       ),
@@ -656,9 +766,9 @@ class _InterestsSection extends StatelessWidget {
 }
 
 class _ActivitySection extends StatelessWidget {
-  const _ActivitySection({required this.profile});
+  const _ActivitySection({required this.history});
 
-  final UserProfile profile;
+  final List<ProfileHistoryItem> history;
 
   @override
   Widget build(BuildContext context) {
@@ -668,7 +778,11 @@ class _ActivitySection extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.timeline_outlined, color: AppColors.textPrimary, size: 22),
+              Icon(
+                Icons.timeline_outlined,
+                color: AppColors.textPrimary,
+                size: 22,
+              ),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -693,28 +807,37 @@ class _ActivitySection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ...profile.recentActivity.map(_activityTile),
+          if (history.isEmpty)
+            Text(
+              'Sem atividades recentes.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary.withValues(alpha: 0.85),
+              ),
+            )
+          else
+            ...history.map(_activityTile),
         ],
       ),
     );
   }
 
-  Widget _activityTile(ProfileActivity a) {
+  Widget _activityTile(ProfileHistoryItem a) {
     final meta = switch (a.kind) {
-      ProfileActivityKind.application => (
-        Icons.work_outline_rounded,
+      ProfileHistoryKind.post => (
+        Icons.article_outlined,
         const Color(0xFF2563EB),
-        'Candidatura',
+        'Post',
       ),
-      ProfileActivityKind.groupJoined => (
+      ProfileHistoryKind.reading => (
+        Icons.menu_book_outlined,
+        const Color(0xFF7C3AED),
+        'Leitura',
+      ),
+      ProfileHistoryKind.group => (
         Icons.groups_2_outlined,
         const Color(0xFF059669),
         'Grupo',
-      ),
-      ProfileActivityKind.eventRegistered => (
-        Icons.event_outlined,
-        const Color(0xFF7C3AED),
-        'Evento',
       ),
     };
 
@@ -724,7 +847,9 @@ class _ActivitySection extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.chipBorder.withValues(alpha: 0.65)),
+          border: Border.all(
+            color: AppColors.chipBorder.withValues(alpha: 0.65),
+          ),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(13),
@@ -732,10 +857,7 @@ class _ActivitySection extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  width: 4,
-                  color: meta.$2,
-                ),
+                Container(width: 4, color: meta.$2),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -786,7 +908,7 @@ class _ActivitySection extends StatelessWidget {
                                   children: [
                                     TextSpan(text: _prefixFor(a.kind)),
                                     TextSpan(
-                                      text: a.titleHighlight,
+                                      text: a.title,
                                       style: const TextStyle(
                                         color: AppColors.textPrimary,
                                         fontWeight: FontWeight.w800,
@@ -820,7 +942,7 @@ class _ActivitySection extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    a.timeAgoLabel,
+                                    _timeAgoLabel(a.createdAt),
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -846,9 +968,93 @@ class _ActivitySection extends StatelessWidget {
     );
   }
 
-  String _prefixFor(ProfileActivityKind k) => switch (k) {
-    ProfileActivityKind.application => 'Você se candidatou a ',
-    ProfileActivityKind.groupJoined => 'Você entrou em ',
-    ProfileActivityKind.eventRegistered => 'Você se inscreveu em ',
+  String _prefixFor(ProfileHistoryKind k) => switch (k) {
+    ProfileHistoryKind.post => 'Post publicado: ',
+    ProfileHistoryKind.reading => 'Leitura publicada: ',
+    ProfileHistoryKind.group => 'Participacao em grupo: ',
   };
+
+  String _timeAgoLabel(DateTime createdAt) {
+    final now = DateTime.now().toUtc();
+    final diff = now.difference(createdAt.toUtc());
+    if (diff.inMinutes < 1) return 'Agora mesmo';
+    if (diff.inHours < 1) return 'Ha ${diff.inMinutes} min';
+    if (diff.inDays < 1) return 'Ha ${diff.inHours} h';
+    if (diff.inDays < 30) return 'Ha ${diff.inDays} dias';
+    final months = (diff.inDays / 30).floor();
+    if (months < 12) return 'Ha $months mes(es)';
+    final years = (months / 12).floor();
+    return 'Ha $years ano(s)';
+  }
+}
+
+class _TopicGroup extends StatelessWidget {
+  const _TopicGroup({
+    required this.title,
+    required this.items,
+    required this.tint,
+  });
+
+  final String title;
+  final List<String> items;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: tint,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (items.isEmpty)
+          Text(
+            'Nenhum item informado.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary.withValues(alpha: 0.8),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 10,
+            children: items
+                .map((item) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          tint.withValues(alpha: 0.12),
+                          tint.withValues(alpha: 0.06),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: tint.withValues(alpha: 0.18)),
+                    ),
+                    child: Text(
+                      item,
+                      style: TextStyle(
+                        color: tint,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  );
+                })
+                .toList(growable: false),
+          ),
+      ],
+    );
+  }
 }
