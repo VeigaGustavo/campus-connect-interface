@@ -24,6 +24,9 @@ List<dynamic> decodeJsonListEnvelope(dynamic decoded) {
       'cards',
       'rows',
       'history',
+      'weekly',
+      'readings',
+      'highlights',
     ];
     for (final k in keys) {
       final v = decoded[k];

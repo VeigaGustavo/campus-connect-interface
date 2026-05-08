@@ -11,7 +11,7 @@ class ReadingRepositoryImpl implements ReadingRepository {
   @override
   Future<List<WeeklyReadingItem>> getWeeklyHighlights() async {
     final raw = await _api.get('/api/reading/weekly');
-    final list = decodeJsonList(raw);
+    final list = decodeJsonListEnvelope(raw);
     return list.map((e) => _map(e as Map<String, dynamic>)).toList();
   }
 
