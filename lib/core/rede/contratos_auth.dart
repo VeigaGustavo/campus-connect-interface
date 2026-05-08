@@ -31,7 +31,7 @@ class RegisterRequestDto {
   const RegisterRequestDto({
     required this.profileType,
     required this.fullName,
-    required this.age,
+    required this.birthDate,
     required this.cpf,
     required this.institution,
     required this.city,
@@ -51,7 +51,8 @@ class RegisterRequestDto {
 
   final RegisterProfileType profileType;
   final String fullName;
-  final int age;
+  /// Apenas a data (sem hora), enviada como `YYYY-MM-DD` em [birth_date].
+  final DateTime birthDate;
   final String cpf;
   final String institution;
   final String city;
@@ -72,7 +73,7 @@ class RegisterRequestDto {
     final data = <String, dynamic>{
       'profile_type': profileType.value,
       'full_name': fullName,
-      'age': age,
+      'birth_date': _formatDateOnly(birthDate),
       'cpf': cpf,
       'institution': institution,
       'city': city,
@@ -91,6 +92,13 @@ class RegisterRequestDto {
     };
     data.removeWhere((_, value) => value == null);
     return data;
+  }
+
+  static String _formatDateOnly(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
   }
 }
 

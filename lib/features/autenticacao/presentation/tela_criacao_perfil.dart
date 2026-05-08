@@ -1,7 +1,9 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
+import 'package:campus_connect_interface/core/autenticacao/validacao_senha.dart';
 import 'package:campus_connect_interface/core/rede/contratos_auth.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
+import 'package:campus_connect_interface/core/widgets/indicador_forca_senha.dart';
 import 'package:campus_connect_interface/features/autenticacao/data/repositorio_autenticacao_api.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -19,13 +21,15 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   RegisterProfileType _type = RegisterProfileType.estudante;
 
   final _nomeCompleto = TextEditingController();
-  final _idade = TextEditingController();
+  final _birthDateLabel = TextEditingController();
+  DateTime? _birthDate;
   final _cpf = TextEditingController();
   final _instituicao = TextEditingController();
   final _cidade = TextEditingController();
   final _estado = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _passwordConfirm = TextEditingController();
 
   final _nomeComunidade = TextEditingController();
   String _tipoComunidade = 'atletica';
@@ -39,17 +43,28 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   final _descricaoInstituicao = TextEditingController();
   bool _loading = false;
   bool _obscurePassword = true;
+  bool _obscurePasswordConfirm = true;
+
+  void _onPasswordChanged() => setState(() {});
+
+  @override
+  void initState() {
+    super.initState();
+    _password.addListener(_onPasswordChanged);
+  }
 
   @override
   void dispose() {
+    _password.removeListener(_onPasswordChanged);
     _nomeCompleto.dispose();
-    _idade.dispose();
+    _birthDateLabel.dispose();
     _cpf.dispose();
     _instituicao.dispose();
     _cidade.dispose();
     _estado.dispose();
     _email.dispose();
     _password.dispose();
+    _passwordConfirm.dispose();
     _nomeComunidade.dispose();
     _nomeEmpresa.dispose();
     _cnpjEmpresa.dispose();
@@ -68,7 +83,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     final dto = RegisterRequestDto(
       profileType: _type,
       fullName: _nomeCompleto.text.trim(),
-      age: int.tryParse(_idade.text.trim()) ?? 0,
+      birthDate: _birthDate!,
       cpf: _cpf.text.trim(),
       institution: _instituicao.text.trim(),
       city: _cidade.text.trim(),
@@ -136,6 +151,35 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
         RegisterProfileType.empresa => 'Criar perfil de empresa',
         RegisterProfileType.universidade => 'Criar perfil de universidade',
       };
+
+  String _formatDateBr(DateTime d) {
+    final day = d.day.toString().padLeft(2, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    return '$day/$m/${d.year}';
+  }
+
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final last = DateTime(now.year, now.month, now.day);
+    final first = DateTime(now.year - 120, 1, 1);
+    final initial = _birthDate ?? DateTime(now.year - 20, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(first)
+          ? first
+          : (initial.isAfter(last) ? last : initial),
+      firstDate: first,
+      lastDate: last,
+      helpText: 'Selecione a data de nascimento',
+      cancelText: 'Cancelar',
+      confirmText: 'OK',
+    );
+    if (picked == null) return;
+    setState(() {
+      _birthDate = picked;
+      _birthDateLabel.text = _formatDateBr(picked);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -317,11 +361,34 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                                 icon: Icons.person_outline_rounded,
                               ),
                               const SizedBox(height: 12),
-                              _field(
-                                _idade,
-                                'Idade',
-                                keyboard: TextInputType.number,
-                                icon: Icons.cake_outlined,
+                              TextFormField(
+                                controller: _birthDateLabel,
+                                readOnly: true,
+                                onTap: () {
+                                  FocusScope.of(context).unfocus();
+                                  _pickBirthDate();
+                                },
+                                decoration: _decoration(
+                                  'Data de nascimento',
+                                  icon: Icons.calendar_month_outlined,
+                                ).copyWith(
+                                  hintText: 'Toque para escolher',
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.event_rounded),
+                                    color: AppColors.primary,
+                                    onPressed: () {
+                                      FocusScope.of(context).unfocus();
+                                      _pickBirthDate();
+                                    },
+                                    tooltip: 'Escolher data',
+                                  ),
+                                ),
+                                validator: (_) {
+                                  if (_birthDate == null) {
+                                    return 'Informe a data de nascimento';
+                                  }
+                                  return null;
+                                },
                               ),
                               const SizedBox(height: 12),
                               _field(
@@ -388,8 +455,53 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                                   ),
                                 ),
                                 validator: (v) {
-                                  if (v == null || v.trim().isEmpty) {
+                                  final p = v?.trim() ?? '';
+                                  if (p.isEmpty) {
                                     return 'Campo obrigatorio';
+                                  }
+                                  final a = PasswordStrength.analyze(p);
+                                  if (!a.isStrong) {
+                                    return 'Use uma senha forte (veja os requisitos abaixo)';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              PasswordStrengthPanel(
+                                analysis:
+                                    PasswordStrength.analyze(_password.text),
+                              ),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _passwordConfirm,
+                                obscureText: _obscurePasswordConfirm,
+                                decoration: _decoration(
+                                  'Confirmar senha',
+                                  icon: Icons.verified_user_outlined,
+                                ).copyWith(
+                                  suffixIcon: IconButton(
+                                    tooltip: _obscurePasswordConfirm
+                                        ? 'Mostrar senha'
+                                        : 'Ocultar senha',
+                                    onPressed: () => setState(
+                                      () => _obscurePasswordConfirm =
+                                          !_obscurePasswordConfirm,
+                                    ),
+                                    icon: Icon(
+                                      _obscurePasswordConfirm
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                validator: (v) {
+                                  final c = v?.trim() ?? '';
+                                  if (c.isEmpty) {
+                                    return 'Confirme sua senha';
+                                  }
+                                  if (c != _password.text) {
+                                    return 'As senhas não coincidem';
                                   }
                                   return null;
                                 },
