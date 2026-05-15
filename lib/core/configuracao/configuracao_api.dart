@@ -20,4 +20,32 @@ abstract final class ApiConfig {
     );
     return AppUserRole.fromValue(fromEnv);
   }
+
+  /// `POST` multipart (`file`, `Content-Type: image/*`). Contrato de perfil v2
+  /// documenta só `GET`/`PUT` `/api/profile`; estes paths são convenção do app
+  /// até o backend expor upload (ex.: `flutter run --dart-define=...`).
+  static String get profileAvatarUploadPath {
+    const fromEnv = String.fromEnvironment(
+      'PROFILE_AVATAR_PATH',
+      defaultValue: '/api/profile/avatar',
+    );
+    return fromEnv.startsWith('/') ? fromEnv : '/$fromEnv';
+  }
+
+  static String get profileCoverUploadPath {
+    const fromEnv = String.fromEnvironment(
+      'PROFILE_COVER_PATH',
+      defaultValue: '/api/profile/cover',
+    );
+    return fromEnv.startsWith('/') ? fromEnv : '/$fromEnv';
+  }
+
+  /// `POST` multipart — campo `file`; resposta com `url` para anexo do post.
+  static String get feedAttachmentUploadPath {
+    const fromEnv = String.fromEnvironment(
+      'FEED_ATTACHMENT_PATH',
+      defaultValue: '/api/feed/attachments',
+    );
+    return fromEnv.startsWith('/') ? fromEnv : '/$fromEnv';
+  }
 }

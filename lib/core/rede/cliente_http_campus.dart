@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:campus_connect_interface/core/rede/contratos_auth.dart';
 import 'package:campus_connect_interface/core/rede/contratos_conteudo.dart';
 import 'package:campus_connect_interface/core/rede/excecao_api.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class CampusApiClient {
@@ -46,6 +47,46 @@ class CampusApiClient {
     final body = res.body;
     if (body.isEmpty) return null;
     return jsonDecode(body);
+  }
+
+  /// `multipart/form-data` — não definir `Content-Type` manualmente (boundary automático).
+  Future<dynamic> postMultipart(
+    String path, {
+    Map<String, String>? query,
+    Map<String, String> fields = const {},
+    required List<http.MultipartFile> files,
+    bool requiresAuth = true,
+  }) async {
+    final uri = _uri(path, query);
+    final request = http.MultipartRequest('POST', uri)
+      ..fields.addAll(fields)
+      ..files.addAll(files);
+    request.headers['Accept'] = 'application/json';
+    if (kDebugMode) {
+      var total = 0;
+      for (final f in files) {
+        total += f.length;
+        debugPrint(
+          '[HTTP] multipart: field="${f.field}" bytes=${f.length} filename=${f.filename}',
+        );
+      }
+      debugPrint('[HTTP] multipart total file bytes=$total fields=${fields.length}');
+    }
+    if (requiresAuth) {
+      final token = _accessToken;
+      if (token == null || token.isEmpty) {
+        throw StateError(
+          'Requisicao autenticada sem token. Faça login antes de chamar este endpoint.',
+        );
+      }
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    final streamed = await _http.send(request);
+    final res = await http.Response.fromStream(streamed);
+    _ensureSuccess(res);
+    final payload = res.body;
+    if (payload.isEmpty) return null;
+    return jsonDecode(payload);
   }
 
   Future<dynamic> post(

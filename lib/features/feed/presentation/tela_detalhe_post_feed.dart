@@ -2,6 +2,7 @@ import 'package:campus_connect_interface/app/provedor_dependencias.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/features/feed/domain/repositorio_feed_posts.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class FeedPostDetailScreen extends StatefulWidget {
   const FeedPostDetailScreen({super.key, required this.postId});
@@ -166,6 +167,106 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   }
 }
 
+class _PostAttachmentTile extends StatelessWidget {
+  const _PostAttachmentTile(this.attachment);
+
+  final FeedAttachment attachment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: switch (attachment.type) {
+        FeedAttachmentType.image => ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              attachment.url,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              errorBuilder: (_, __, ___) => _linkStyleCard(
+                icon: Icons.broken_image_outlined,
+                title: attachment.name ?? 'Imagem',
+                subtitle: attachment.url,
+              ),
+            ),
+          ),
+        FeedAttachmentType.video => _linkStyleCard(
+            icon: Icons.videocam_outlined,
+            title: attachment.name ?? 'Vídeo',
+            subtitle: attachment.url,
+            onTap: () => _openUrl(attachment.url),
+          ),
+        FeedAttachmentType.link => _linkStyleCard(
+            icon: Icons.link_rounded,
+            title: attachment.name ?? 'Link',
+            subtitle: attachment.url,
+            onTap: () => _openUrl(attachment.url),
+          ),
+        FeedAttachmentType.file => _linkStyleCard(
+            icon: Icons.attach_file_rounded,
+            title: attachment.name ?? 'Arquivo',
+            subtitle: attachment.url,
+            onTap: () => _openUrl(attachment.url),
+          ),
+      },
+    );
+  }
+
+  Widget _linkStyleCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
 class _PostHeader extends StatelessWidget {
   const _PostHeader({
     required this.post,
@@ -208,14 +309,10 @@ class _PostHeader extends StatelessWidget {
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: post.attachments
-                  .map((a) => Chip(label: Text('${a.type.name}: ${a.url}')))
-                  .toList(),
-            ),
+            if (post.attachments.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ...post.attachments.map(_PostAttachmentTile.new),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [

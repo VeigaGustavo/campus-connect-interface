@@ -1,7 +1,11 @@
+import 'package:campus_connect_interface/core/configuracao/configuracao_api.dart';
 import 'package:campus_connect_interface/core/rede/cliente_http_campus.dart';
 import 'package:campus_connect_interface/core/rede/decodificacao_json.dart';
+import 'package:campus_connect_interface/core/rede/url_midia_api.dart';
 import 'package:campus_connect_interface/features/perfil/domain/repositorio_perfil.dart';
 import 'package:campus_connect_interface/features/perfil/domain/perfil_usuario.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
   ProfileRepositoryImpl(this._api);
@@ -25,6 +29,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
       'course': input.course,
       'semester': input.semester,
       'institution_name': input.institutionName,
+      'map_url': input.mapUrl.trim(),
       'interests': _normalizeLabelList(input.interests),
       'favorite_topics': _normalizeLabelList(input.favoriteTopics),
       'specialties': _normalizeLabelList(input.specialties),
@@ -39,6 +44,113 @@ class ProfileRepositoryImpl implements ProfileRepository {
       throw StateError('Resposta de atualização de perfil vazia');
     }
     return _mapProfile(decodeJsonObject(raw));
+  }
+
+  static MediaType _mediaTypeForFilename(String filename) {
+    final f = filename.toLowerCase();
+    if (f.endsWith('.png')) return MediaType('image', 'png');
+    if (f.endsWith('.gif')) return MediaType('image', 'gif');
+    if (f.endsWith('.webp')) return MediaType('image', 'webp');
+    if (f.endsWith('.bmp')) return MediaType('image', 'bmp');
+    return MediaType('image', 'jpeg');
+  }
+
+  /// Part único com bytes da imagem (nunca URL `blob:`). A API aceita também
+  /// `file` / `image`; usamos `avatar` e `cover` como no contrato do backend.
+  static List<http.MultipartFile> _multipartProfileImageParts({
+    required String fieldName,
+    required List<int> bytes,
+    required String safeName,
+    required MediaType contentType,
+  }) {
+    return [
+      http.MultipartFile.fromBytes(
+        fieldName,
+        bytes,
+        filename: safeName,
+        contentType: contentType,
+      ),
+    ];
+  }
+
+  @override
+  Future<UserProfile> uploadProfileAvatar({
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    if (bytes.isEmpty) {
+      throw StateError('Imagem vazia; nada para enviar.');
+    }
+    final safeName = filename.trim().isEmpty ? 'avatar.jpg' : filename;
+    final ct = _mediaTypeForFilename(safeName);
+    final raw = await _api.postMultipart(
+      ApiConfig.profileAvatarUploadPath,
+      files: _multipartProfileImageParts(
+        fieldName: 'avatar',
+        bytes: bytes,
+        safeName: safeName,
+        contentType: ct,
+      ),
+      requiresAuth: true,
+    );
+    return _profileAfterAvatarUpload(raw);
+  }
+
+  Future<UserProfile> _profileAfterAvatarUpload(dynamic uploadRaw) async {
+    var profile = await getCurrentProfile();
+    if (uploadRaw != null) {
+      final m = decodeJsonObject(uploadRaw);
+      final fromPost = mediaUrlFromJson(m, const [
+        'avatar_image_url',
+        'avatar_url',
+        'avatar',
+        'url',
+      ]);
+      if (fromPost.isNotEmpty) {
+        profile = profile.copyWith(avatarImageUrl: fromPost);
+      }
+    }
+    return profile;
+  }
+
+  Future<UserProfile> _profileAfterCoverUpload(dynamic uploadRaw) async {
+    var profile = await getCurrentProfile();
+    if (uploadRaw != null) {
+      final m = decodeJsonObject(uploadRaw);
+      final fromPost = mediaUrlFromJson(m, const [
+        'cover_image_url',
+        'cover_url',
+        'cover',
+        'url',
+      ]);
+      if (fromPost.isNotEmpty) {
+        profile = profile.copyWith(coverImageUrl: fromPost);
+      }
+    }
+    return profile;
+  }
+
+  @override
+  Future<UserProfile> uploadProfileCover({
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    if (bytes.isEmpty) {
+      throw StateError('Imagem vazia; nada para enviar.');
+    }
+    final safeName = filename.trim().isEmpty ? 'cover.jpg' : filename;
+    final ct = _mediaTypeForFilename(safeName);
+    final raw = await _api.postMultipart(
+      ApiConfig.profileCoverUploadPath,
+      files: _multipartProfileImageParts(
+        fieldName: 'cover',
+        bytes: bytes,
+        safeName: safeName,
+        contentType: ct,
+      ),
+      requiresAuth: true,
+    );
+    return _profileAfterCoverUpload(raw);
   }
 
   @override
@@ -84,11 +196,42 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   static UserProfile _mapProfile(Map<String, dynamic> j) {
+    final legacyType = AccountProfileType.fromApiValue(j['profile_type']);
+    final profileContext = ProfileContext.fromApi(
+      j['profile_context'],
+      legacyProfileType: legacyType,
+    );
+    final profileType = AccountProfileType.fromProfilePayload(
+      profileContext: profileContext,
+      role: j['role'] ?? j['account_role'],
+      profileType: j['profile_type'],
+    );
+    final CommunityHighlight? communityHighlight =
+        profileContext == ProfileContext.organization
+            ? null
+            : _mapCommunityHighlight(j['community_highlight']);
+
+    final OrganizationPanel? organizationPanel =
+        profileContext == ProfileContext.organization
+            ? _mapOrganizationPanel(j['organization_panel'])
+            : null;
+
     return UserProfile(
       id: _stringOrEmpty(j['id']),
+      profileContext: profileContext,
+      profileType: profileType,
       name: _stringOrEmpty(j['name']),
-      coverImageUrl: _stringOrEmpty(j['cover_image_url']),
-      avatarImageUrl: _stringOrEmpty(j['avatar_image_url']),
+      coverImageUrl: mediaUrlFromJson(j, const [
+        'cover_image_url',
+        'cover_url',
+        'cover',
+      ]),
+      avatarImageUrl: mediaUrlFromJson(j, const [
+        'avatar_image_url',
+        'avatar_url',
+        'avatar',
+        'profile_image_url',
+      ]),
       email: _stringOrEmpty(j['email']),
       cityState: _stringOrEmpty(j['city_state']),
       aboutMe: _stringOrEmpty(j['about_me']),
@@ -102,8 +245,78 @@ class ProfileRepositoryImpl implements ProfileRepository {
       interests: _mapStringList(j['interests']),
       favoriteTopics: _mapStringList(j['favorite_topics']),
       specialties: _mapStringList(j['specialties']),
-      communityHighlight: _mapCommunityHighlight(j['community_highlight']),
+      communityHighlight: communityHighlight,
+      organizationPanel: organizationPanel,
     );
+  }
+
+  static OrganizationPanel _mapOrganizationPanel(dynamic raw) {
+    if (raw == null || raw is! Map) {
+      return const OrganizationPanel();
+    }
+    final j = Map<String, dynamic>.from(raw);
+    return OrganizationPanel(
+      parentInstitution: _nullableNonEmptyString(j['parent_institution']),
+      mapUrl: _nullableNonEmptyString(j['map_url']),
+      jobs: _parseOrganizationListed(j['jobs']),
+      events: _parseOrganizationListed(j['events']),
+      groups: _parseOrganizationListed(j['groups']),
+      posts: _parseOrganizationPosts(j['posts']),
+      jobsTotal: _toInt(j['jobs_total']),
+      eventsTotal: _toInt(j['events_total']),
+      groupsTotal: _toInt(j['groups_total']),
+      postsTotal: _toInt(j['posts_total']),
+    );
+  }
+
+  static String? _nullableNonEmptyString(dynamic value) {
+    final s = _stringOrEmpty(value).trim();
+    return s.isEmpty ? null : s;
+  }
+
+  static List<OrganizationPanelListedItem> _parseOrganizationListed(
+    dynamic raw,
+  ) {
+    if (raw is! List) return const [];
+    final out = <OrganizationPanelListedItem>[];
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final m = Map<String, dynamic>.from(e);
+      out.add(
+        OrganizationPanelListedItem(
+          id: _stringOrEmpty(m['id']),
+          title: _stringOrEmpty(m['title']),
+          subtitle: _stringOrEmpty(m['subtitle']),
+          referenceId: _stringOrEmpty(m['reference_id']),
+          createdAt:
+              DateTime.tryParse(_stringOrEmpty(m['created_at'])) ??
+              DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        ),
+      );
+    }
+    return out;
+  }
+
+  static List<OrganizationPanelPost> _parseOrganizationPosts(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <OrganizationPanelPost>[];
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final m = Map<String, dynamic>.from(e);
+      final preview = _stringOrEmpty(m['preview']);
+      final title = _stringOrEmpty(m['title']);
+      final text = preview.isNotEmpty ? preview : title;
+      out.add(
+        OrganizationPanelPost(
+          id: _stringOrEmpty(m['id']),
+          preview: text,
+          createdAt:
+              DateTime.tryParse(_stringOrEmpty(m['created_at'])) ??
+              DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        ),
+      );
+    }
+    return out;
   }
 
   static ProfileHistoryItem _mapHistoryItem(Map<String, dynamic> j) {

@@ -1,11 +1,13 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
-import 'package:campus_connect_interface/core/autenticacao/sessao_local.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/mensagem_erro_api.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
 import 'package:campus_connect_interface/features/perfil/domain/perfil_usuario.dart';
+import 'package:campus_connect_interface/features/perfil/presentation/cartao_painel_organizacao.dart';
+import 'package:campus_connect_interface/features/perfil/presentation/cartoes_secao_perfil.dart';
+import 'package:campus_connect_interface/features/perfil/presentation/modal_configuracoes_perfil.dart';
+import 'package:campus_connect_interface/features/perfil/presentation/widget_imagem_midia_perfil.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,19 +31,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await next;
   }
 
+  Future<void> _openSettings() async {
+    final updated = await showProfileSettingsModal(context);
+    if (updated == true && mounted) await _reload();
+  }
+
   Future<_ProfileViewData> _loadProfileView() async {
     final repo = DependencyScope.of(context).profileRepository;
     final profile = await repo.getCurrentProfile();
-    final history = await repo.getCurrentUserHistory(limit: 20);
-    return _ProfileViewData(profile: profile, history: history);
-  }
-
-  Future<void> _logout() async {
-    await LocalSessionStore.clear();
-    if (!mounted) return;
-    final deps = DependencyScope.of(context);
-    deps.apiClient.clearAccessToken();
-    context.go('/login');
+    return _ProfileViewData(profile: profile);
   }
 
   @override
@@ -72,7 +70,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               slivers: [
                 SliverToBoxAdapter(
-                  child: _ProfileHeader(profile: p, onLogout: _logout),
+                  child: _ProfileHeader(
+                    profile: p,
+                    onOpenSettings: _openSettings,
+                  ),
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -80,11 +81,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     delegate: SliverChildListDelegate([
                       _StatsStrip(profile: p),
                       const SizedBox(height: 14),
-                      _SummarySection(profile: p),
-                      const SizedBox(height: 14),
-                      _InterestsSection(profile: p),
-                      const SizedBox(height: 14),
-                      _ActivitySection(history: view.history),
+                      ProfilePreferencesCard(profile: p),
+                      if (p.isOrganizationProfile) ...[
+                        const SizedBox(height: 14),
+                        OrganizationPanelCard(
+                          panel:
+                              p.organizationPanel ?? const OrganizationPanel(),
+                          profileType: p.profileType,
+                        ),
+                      ],
                       const SizedBox(height: 100),
                     ]),
                   ),
@@ -99,10 +104,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 class _ProfileViewData {
-  const _ProfileViewData({required this.profile, required this.history});
+  const _ProfileViewData({required this.profile});
 
   final UserProfile profile;
-  final List<ProfileHistoryItem> history;
 }
 
 class _ProfileLoading extends StatelessWidget {
@@ -124,7 +128,7 @@ class _ProfileLoading extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Carregando seu perfil…',
+            'Carregando informações…',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -132,6 +136,38 @@ class _ProfileLoading extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AccountTypeChip extends StatelessWidget {
+  const _AccountTypeChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.22),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: AppColors.primary,
+            letterSpacing: 0.1,
+          ),
+        ),
       ),
     );
   }
@@ -170,11 +206,122 @@ class _CommunitySeal extends StatelessWidget {
   };
 }
 
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.profile, required this.onLogout});
+class _StudentAcademicCard extends StatelessWidget {
+  const _StudentAcademicCard({required this.profile});
 
   final UserProfile profile;
-  final Future<void> Function() onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final institution = profile.institutionName.trim();
+    final course = profile.course.trim();
+    final period = formatProfilePeriodLabel(profile.semester);
+
+    return SoftCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _cell(
+                icon: Icons.account_balance_outlined,
+                label: 'Instituição',
+                value: institution.isNotEmpty ? institution : 'Não informada',
+              ),
+            ),
+            _divider(),
+            Expanded(
+              child: _cell(
+                icon: Icons.school_outlined,
+                label: 'Graduação',
+                value: course.isNotEmpty ? course : 'Não informada',
+              ),
+            ),
+            _divider(),
+            Expanded(
+              child: _cell(
+                icon: Icons.calendar_month_outlined,
+                label: 'Período',
+                value: period.isNotEmpty ? period : 'Não informado',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _divider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: VerticalDivider(
+        width: 1,
+        thickness: 1,
+        color: AppColors.chipBorder.withValues(alpha: 0.85),
+      ),
+    );
+  }
+
+  Widget _cell({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    final isPlaceholder =
+        value == 'Não informada' || value == 'Não informado';
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        Container(
+          height: 32,
+          width: 32,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(icon, size: 17, color: AppColors.primary),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary.withValues(alpha: 0.9),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.25,
+            fontWeight: FontWeight.w700,
+            color: isPlaceholder
+                ? AppColors.textSecondary.withValues(alpha: 0.75)
+                : AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.profile,
+    required this.onOpenSettings,
+  });
+
+  final UserProfile profile;
+  final Future<void> Function() onOpenSettings;
 
   static const _bannerDeep = Color(0xFF0F172A);
   static const _bannerMid = Color(0xFF1E3A8A);
@@ -197,13 +344,12 @@ class _ProfileHeader extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    profile.coverImageUrl,
-                    fit: BoxFit.cover,
+                  ProfileMediaImage(
+                    url: profile.coverImageUrl,
                     width: double.infinity,
                     height: double.infinity,
-                    alignment: Alignment.center,
-                    errorBuilder: (_, _, _) => Container(
+                    fit: BoxFit.cover,
+                    error: Container(
                       width: double.infinity,
                       height: double.infinity,
                       decoration: const BoxDecoration(
@@ -251,7 +397,7 @@ class _ProfileHeader extends StatelessWidget {
                       child: Row(
                         children: [
                           Text(
-                            'Perfil',
+                            profile.profileType.shellBarTitle,
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -278,32 +424,7 @@ class _ProfileHeader extends StatelessWidget {
                               ),
                               foregroundColor: Colors.white,
                             ),
-                            onPressed: () async {
-                              final confirm = await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Sair da conta'),
-                                  content: const Text(
-                                    'Deseja encerrar sua sessao neste dispositivo?',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text('Cancelar'),
-                                    ),
-                                    FilledButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text('Sair'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (confirm == true) {
-                                await onLogout();
-                              }
-                            },
+                            onPressed: onOpenSettings,
                             icon: const Icon(Icons.settings_outlined),
                           ),
                         ],
@@ -334,12 +455,12 @@ class _ProfileHeader extends StatelessWidget {
                       ],
                     ),
                     child: ClipOval(
-                      child: Image.network(
-                        profile.avatarImageUrl,
+                      child: ProfileMediaImage(
+                        url: profile.avatarImageUrl,
                         width: avatarR * 2,
                         height: avatarR * 2,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
+                        error: Container(
                           width: avatarR * 2,
                           height: avatarR * 2,
                           color: AppColors.primary,
@@ -354,25 +475,20 @@ class _ProfileHeader extends StatelessWidget {
                             ),
                           ),
                         ),
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Container(
-                            width: avatarR * 2,
-                            height: avatarR * 2,
-                            color: AppColors.primary.withValues(alpha: 0.25),
-                            alignment: Alignment.center,
-                            child: SizedBox(
-                              width: 26,
-                              height: 26,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.85,
-                                ),
-                              ),
+                        placeholder: Container(
+                          width: avatarR * 2,
+                          height: avatarR * 2,
+                          color: AppColors.primary.withValues(alpha: 0.25),
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: AppColors.primary.withValues(alpha: 0.85),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -399,7 +515,7 @@ class _ProfileHeader extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Perfil verificado',
+                          profile.profileType.verifiedBadgeLabel,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -433,7 +549,8 @@ class _ProfileHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (profile.communityHighlight != null) ...[
+                  if (profile.communityHighlight != null &&
+                      !profile.isOrganizationProfile) ...[
                     const SizedBox(width: 10),
                     _CommunitySeal(community: profile.communityHighlight!),
                   ],
@@ -441,6 +558,10 @@ class _ProfileHeader extends StatelessWidget {
               ),
 
               const SizedBox(height: 8),
+              if (profile.isOrganizationProfile) ...[
+                _AccountTypeChip(label: profile.profileType.kindChipLabel),
+                const SizedBox(height: 10),
+              ],
               if (profile.jobTitle.trim().isNotEmpty) ...[
                 Text(
                   profile.jobTitle,
@@ -453,15 +574,22 @@ class _ProfileHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
               ],
-              Text(
-                _courseSubtitle(profile),
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary.withValues(alpha: 0.95),
-                ),
-              ),
+              if (profile.isOrganizationProfile) ...[
+                if (_institutionSubtitleLine(profile).isNotEmpty)
+                  Text(
+                    _institutionSubtitleLine(profile),
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary.withValues(alpha: 0.95),
+                    ),
+                  ),
+              ] else ...[
+                _StudentAcademicCard(profile: profile),
+                const SizedBox(height: 14),
+                ProfileAboutCard(profile: profile),
+              ],
               const SizedBox(height: 14),
               SoftCard(
                 padding: const EdgeInsets.all(14),
@@ -483,13 +611,15 @@ class _ProfileHeader extends StatelessWidget {
     );
   }
 
-  String _courseSubtitle(UserProfile profile) {
-    final base = profile.course.trim();
-    final semester = profile.semester.trim();
-    if (base.isEmpty && semester.isEmpty) return 'Sem curso informado';
-    if (base.isEmpty) return '$semester semestre';
-    if (semester.isEmpty) return base;
-    return '$base - $semester semestre';
+  String _institutionSubtitleLine(UserProfile profile) {
+    final loc = profile.cityState.trim();
+    if (loc.isNotEmpty) return loc;
+    final extra = profile.institutionName.trim();
+    final name = profile.name.trim();
+    if (extra.isNotEmpty && extra.toLowerCase() != name.toLowerCase()) {
+      return extra;
+    }
+    return '';
   }
 
   String _initialsFor(String name) {
@@ -543,23 +673,118 @@ class _StatsStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-      child: Row(
-        children: [
+    if (!profile.isOrganizationProfile) {
+      return SoftCard(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: _statBlock(
+                icon: Icons.description_outlined,
+                value: '${profile.applicationsCount}',
+                label: 'Candidaturas',
+                tint: const Color(0xFF2563EB),
+              ),
+            ),
+            _vDivider(),
+            Expanded(
+              child: _statBlock(
+                icon: Icons.groups_2_outlined,
+                value: '${profile.groupsCount}',
+                label: 'Grupos',
+                tint: const Color(0xFF059669),
+              ),
+            ),
+            _vDivider(),
+            Expanded(
+              child: _statBlock(
+                icon: Icons.event_available_outlined,
+                value: '${profile.eventsCount}',
+                label: 'Eventos',
+                tint: const Color(0xFF7C3AED),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final p = profile.organizationPanel ?? const OrganizationPanel();
+    final t = profile.profileType;
+
+    Widget orgRow(List<Widget> children) {
+      return SoftCard(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+        child: Row(children: children),
+      );
+    }
+
+    switch (t) {
+      case AccountProfileType.empresa:
+        return orgRow([
           Expanded(
             child: _statBlock(
-              icon: Icons.description_outlined,
-              value: '${profile.applicationsCount}',
-              label: 'Candidaturas',
+              icon: Icons.work_outline_rounded,
+              value: '${p.jobsTotal}',
+              label: 'Vagas',
               tint: const Color(0xFF2563EB),
             ),
           ),
           _vDivider(),
           Expanded(
             child: _statBlock(
+              icon: Icons.event_available_outlined,
+              value: '${p.eventsTotal}',
+              label: 'Eventos',
+              tint: const Color(0xFF7C3AED),
+            ),
+          ),
+          _vDivider(),
+          Expanded(
+            child: _statBlock(
+              icon: Icons.article_outlined,
+              value: '${p.postsTotal}',
+              label: 'Posts',
+              tint: const Color(0xFF0891B2),
+            ),
+          ),
+        ]);
+      case AccountProfileType.universidade:
+        final mapOk = p.mapUrl != null && p.mapUrl!.trim().isNotEmpty;
+        return orgRow([
+          Expanded(
+            child: _statBlock(
+              icon: Icons.event_available_outlined,
+              value: '${p.eventsTotal}',
+              label: 'Eventos',
+              tint: const Color(0xFF7C3AED),
+            ),
+          ),
+          _vDivider(),
+          Expanded(
+            child: _statBlock(
+              icon: Icons.article_outlined,
+              value: '${p.postsTotal}',
+              label: 'Posts',
+              tint: const Color(0xFF0891B2),
+            ),
+          ),
+          _vDivider(),
+          Expanded(
+            child: _statBlock(
+              icon: Icons.map_outlined,
+              value: mapOk ? '1' : '0',
+              label: 'Mapa',
+              tint: const Color(0xFF059669),
+            ),
+          ),
+        ]);
+      case AccountProfileType.comunidade:
+        return orgRow([
+          Expanded(
+            child: _statBlock(
               icon: Icons.groups_2_outlined,
-              value: '${profile.groupsCount}',
+              value: '${p.groupsTotal}',
               label: 'Grupos',
               tint: const Color(0xFF059669),
             ),
@@ -568,14 +793,42 @@ class _StatsStrip extends StatelessWidget {
           Expanded(
             child: _statBlock(
               icon: Icons.event_available_outlined,
-              value: '${profile.eventsCount}',
+              value: '${p.eventsTotal}',
               label: 'Eventos',
               tint: const Color(0xFF7C3AED),
             ),
           ),
-        ],
-      ),
-    );
+          _vDivider(),
+          Expanded(
+            child: _statBlock(
+              icon: Icons.article_outlined,
+              value: '${p.postsTotal}',
+              label: 'Posts',
+              tint: const Color(0xFF0891B2),
+            ),
+          ),
+        ]);
+      case AccountProfileType.estudante:
+        return orgRow([
+          Expanded(
+            child: _statBlock(
+              icon: Icons.groups_2_outlined,
+              value: '${p.groupsTotal}',
+              label: 'Grupos',
+              tint: const Color(0xFF059669),
+            ),
+          ),
+          _vDivider(),
+          Expanded(
+            child: _statBlock(
+              icon: Icons.event_available_outlined,
+              value: '${p.eventsTotal}',
+              label: 'Eventos',
+              tint: const Color(0xFF7C3AED),
+            ),
+          ),
+        ]);
+    }
   }
 
   Widget _vDivider() {
@@ -624,436 +877,6 @@ class _StatsStrip extends StatelessWidget {
             color: AppColors.textSecondary.withValues(alpha: 0.9),
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _SummarySection extends StatelessWidget {
-  const _SummarySection({required this.profile});
-
-  final UserProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.person_outline_rounded, color: AppColors.textPrimary),
-              SizedBox(width: 8),
-              Text(
-                'Sobre o perfil',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (profile.aboutMe.trim().isNotEmpty)
-            Text(
-              profile.aboutMe,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.45,
-                color: AppColors.textSecondary,
-              ),
-            )
-          else
-            Text(
-              'Sem descricao no momento.',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary.withValues(alpha: 0.9),
-              ),
-            ),
-          if (profile.institutionName.trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  Icons.school_outlined,
-                  size: 18,
-                  color: AppColors.textSecondary.withValues(alpha: 0.85),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    profile.institutionName,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _InterestsSection extends StatelessWidget {
-  const _InterestsSection({required this.profile});
-
-  final UserProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.auto_awesome_outlined,
-                color: AppColors.primary,
-                size: 22,
-              ),
-              SizedBox(width: 8),
-              Text(
-                'Preferencias',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Gostos, topicos favoritos e especialidades do seu perfil.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.35,
-              color: AppColors.textSecondary.withValues(alpha: 0.9),
-            ),
-          ),
-          const SizedBox(height: 14),
-          _TopicGroup(
-            title: 'Interesses',
-            items: profile.interests,
-            tint: AppColors.primary,
-          ),
-          const SizedBox(height: 12),
-          _TopicGroup(
-            title: 'Topicos favoritos',
-            items: profile.favoriteTopics,
-            tint: const Color(0xFF0EA5E9),
-          ),
-          const SizedBox(height: 12),
-          _TopicGroup(
-            title: 'Especialidades',
-            items: profile.specialties,
-            tint: const Color(0xFF059669),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActivitySection extends StatelessWidget {
-  const _ActivitySection({required this.history});
-
-  final List<ProfileHistoryItem> history;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.timeline_outlined,
-                color: AppColors.textPrimary,
-                size: 22,
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Painel de atividade',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Histórico recente visível apenas para você.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.35,
-              color: AppColors.textSecondary.withValues(alpha: 0.9),
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (history.isEmpty)
-            Text(
-              'Sem atividades recentes.',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary.withValues(alpha: 0.85),
-              ),
-            )
-          else
-            ...history.map(_activityTile),
-        ],
-      ),
-    );
-  }
-
-  Widget _activityTile(ProfileHistoryItem a) {
-    final meta = switch (a.kind) {
-      ProfileHistoryKind.post => (
-        Icons.article_outlined,
-        const Color(0xFF2563EB),
-        'Post',
-      ),
-      ProfileHistoryKind.reading => (
-        Icons.menu_book_outlined,
-        const Color(0xFF7C3AED),
-        'Leitura',
-      ),
-      ProfileHistoryKind.group => (
-        Icons.groups_2_outlined,
-        const Color(0xFF059669),
-        'Grupo',
-      ),
-    };
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppColors.chipBorder.withValues(alpha: 0.65),
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(width: 4, color: meta.$2),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          height: 44,
-                          width: 44,
-                          decoration: BoxDecoration(
-                            color: meta.$2.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(meta.$1, color: meta.$2, size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: meta.$2.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  meta.$3,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.4,
-                                    color: meta.$2,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              RichText(
-                                text: TextSpan(
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    height: 1.4,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  children: [
-                                    TextSpan(text: _prefixFor(a.kind)),
-                                    TextSpan(
-                                      text: a.title,
-                                      style: const TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (a.subtitle.isNotEmpty) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  a.subtitle,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textSecondary.withValues(
-                                      alpha: 0.92,
-                                    ),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.schedule_rounded,
-                                    size: 15,
-                                    color: AppColors.textSecondary.withValues(
-                                      alpha: 0.75,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _timeAgoLabel(a.createdAt),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textSecondary.withValues(
-                                        alpha: 0.78,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _prefixFor(ProfileHistoryKind k) => switch (k) {
-    ProfileHistoryKind.post => 'Post publicado: ',
-    ProfileHistoryKind.reading => 'Leitura publicada: ',
-    ProfileHistoryKind.group => 'Participacao em grupo: ',
-  };
-
-  String _timeAgoLabel(DateTime createdAt) {
-    final now = DateTime.now().toUtc();
-    final diff = now.difference(createdAt.toUtc());
-    if (diff.inMinutes < 1) return 'Agora mesmo';
-    if (diff.inHours < 1) return 'Ha ${diff.inMinutes} min';
-    if (diff.inDays < 1) return 'Ha ${diff.inHours} h';
-    if (diff.inDays < 30) return 'Ha ${diff.inDays} dias';
-    final months = (diff.inDays / 30).floor();
-    if (months < 12) return 'Ha $months mes(es)';
-    final years = (months / 12).floor();
-    return 'Ha $years ano(s)';
-  }
-}
-
-class _TopicGroup extends StatelessWidget {
-  const _TopicGroup({
-    required this.title,
-    required this.items,
-    required this.tint,
-  });
-
-  final String title;
-  final List<String> items;
-  final Color tint;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: tint,
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (items.isEmpty)
-          Text(
-            'Nenhum item informado.',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary.withValues(alpha: 0.8),
-            ),
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 10,
-            children: items
-                .map((item) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          tint.withValues(alpha: 0.12),
-                          tint.withValues(alpha: 0.06),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: tint.withValues(alpha: 0.18)),
-                    ),
-                    child: Text(
-                      item,
-                      style: TextStyle(
-                        color: tint,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  );
-                })
-                .toList(growable: false),
-          ),
       ],
     );
   }

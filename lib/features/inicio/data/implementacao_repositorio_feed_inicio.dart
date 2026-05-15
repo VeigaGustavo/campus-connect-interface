@@ -50,6 +50,7 @@ class HomeFeedRepositoryImpl implements HomeFeedRepository {
   }
 
   static HomeFeedKind _parseKind(String s) => switch (s) {
+        'post' => HomeFeedKind.post,
         'internship' => HomeFeedKind.opportunity,
         'opportunity' => HomeFeedKind.opportunity,
         'event' => HomeFeedKind.event,

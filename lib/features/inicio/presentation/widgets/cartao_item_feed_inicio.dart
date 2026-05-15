@@ -156,6 +156,11 @@ class HomeFeedCard extends StatelessWidget {
   }
 
   (Color, IconData, String) _tagFor(HomeFeedKind k) => switch (k) {
+        HomeFeedKind.post => (
+            AppColors.primary,
+            Icons.forum_outlined,
+            'Post',
+          ),
         HomeFeedKind.opportunity => (
             AppColors.tagInternship,
             Icons.work_outline_rounded,

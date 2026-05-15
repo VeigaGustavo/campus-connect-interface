@@ -8,6 +8,7 @@ import 'package:campus_connect_interface/features/grupos/presentation/tela_grupo
 import 'package:campus_connect_interface/features/inicio/presentation/tela_inicio.dart';
 import 'package:campus_connect_interface/features/oportunidades/presentation/tela_detalhe_oportunidade.dart';
 import 'package:campus_connect_interface/features/oportunidades/presentation/tela_oportunidades.dart';
+import 'package:campus_connect_interface/features/perfil/presentation/tela_configuracoes_perfil.dart';
 import 'package:campus_connect_interface/features/perfil/presentation/tela_perfil.dart';
 import 'package:campus_connect_interface/features/leituras/presentation/tela_leituras.dart';
 import 'package:campus_connect_interface/features/painel_principal/painel_principal.dart';
@@ -119,6 +120,11 @@ GoRouter createAppRouter() {
           final id = state.pathParameters['id']!;
           return FeedPostDetailScreen(postId: id);
         },
+      ),
+      GoRoute(
+        path: '/profile/settings',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ProfileSettingsScreen(),
       ),
     ],
   );
