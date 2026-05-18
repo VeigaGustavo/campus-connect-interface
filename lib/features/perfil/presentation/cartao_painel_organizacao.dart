@@ -1,10 +1,10 @@
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
 import 'package:campus_connect_interface/features/perfil/domain/perfil_usuario.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Cartão com totais do `organization_panel` e pré-visualização das listas (contrato v2).
 class OrganizationPanelCard extends StatelessWidget {
   const OrganizationPanelCard({
     super.key,
@@ -29,9 +29,9 @@ class OrganizationPanelCard extends StatelessWidget {
                 size: 22,
               ),
               const SizedBox(width: 8),
-              const Text(
-                'Painel da organização',
-                style: TextStyle(
+              Text(
+                profileType.organizationPanelTitle,
+                style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
@@ -42,14 +42,17 @@ class OrganizationPanelCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Conteúdo publicado por esta conta (amostra até 12 itens por lista na API).',
+            profileType == AccountProfileType.comunidade
+                ? 'Grupos, eventos e publicações da sua comunidade (amostra da API).'
+                : 'Conteúdo publicado por esta conta (amostra até 12 itens por lista na API).',
             style: TextStyle(
               fontSize: 13,
               height: 1.35,
               color: AppColors.textSecondary.withValues(alpha: 0.9),
             ),
           ),
-          if (panel.parentInstitution != null) ...[
+          if (panel.parentInstitution != null &&
+              profileType != AccountProfileType.comunidade) ...[
             const SizedBox(height: 14),
             _infoRow(
               icon: Icons.apartment_outlined,
@@ -106,16 +109,12 @@ class OrganizationPanelCard extends StatelessWidget {
   Future<void> _openMap(BuildContext context, String url) async {
     final uri = Uri.tryParse(url);
     if (uri == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('URL do mapa inválida.')),
-      );
+      showFloatingSnackBar(context, 'URL do mapa inválida.');
       return;
     }
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível abrir o link.')),
-      );
+      showFloatingSnackBar(context, 'Não foi possível abrir o link.');
     }
   }
 

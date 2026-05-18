@@ -183,7 +183,7 @@ class _PostAttachmentTile extends StatelessWidget {
               attachment.url,
               fit: BoxFit.cover,
               width: double.infinity,
-              errorBuilder: (_, __, ___) => _linkStyleCard(
+              errorBuilder: (_, _, _) => _linkStyleCard(
                 icon: Icons.broken_image_outlined,
                 title: attachment.name ?? 'Imagem',
                 subtitle: attachment.url,

@@ -31,7 +31,7 @@ class RegisterRequestDto {
   const RegisterRequestDto({
     required this.profileType,
     required this.fullName,
-    required this.birthDate,
+    this.birthDate,
     required this.cpf,
     required this.institution,
     required this.city,
@@ -40,6 +40,9 @@ class RegisterRequestDto {
     required this.password,
     this.communityType,
     this.communityName,
+    this.groupTitle,
+    this.groupDescription,
+    this.groupVisibility,
     this.companyName,
     this.companyCnpj,
     this.companyDescription,
@@ -51,8 +54,7 @@ class RegisterRequestDto {
 
   final RegisterProfileType profileType;
   final String fullName;
-  /// Apenas a data (sem hora), enviada como `YYYY-MM-DD` em [birth_date].
-  final DateTime birthDate;
+  final DateTime? birthDate;
   final String cpf;
   final String institution;
   final String city;
@@ -61,6 +63,9 @@ class RegisterRequestDto {
   final String password;
   final String? communityType;
   final String? communityName;
+  final String? groupTitle;
+  final String? groupDescription;
+  final String? groupVisibility;
   final String? companyName;
   final String? companyCnpj;
   final String? companyDescription;
@@ -73,7 +78,7 @@ class RegisterRequestDto {
     final data = <String, dynamic>{
       'profile_type': profileType.value,
       'full_name': fullName,
-      'birth_date': _formatDateOnly(birthDate),
+      if (birthDate != null) 'birth_date': _formatDateOnly(birthDate!),
       'cpf': cpf,
       'institution': institution,
       'city': city,
@@ -82,6 +87,9 @@ class RegisterRequestDto {
       'password': password,
       'community_type': communityType,
       'community_name': communityName,
+      'group_title': groupTitle,
+      'group_description': groupDescription,
+      'group_visibility': groupVisibility,
       'company_name': companyName,
       'company_cnpj': companyCnpj,
       'company_description': companyDescription,
@@ -90,7 +98,11 @@ class RegisterRequestDto {
       'institution_type': institutionType,
       'institution_description': institutionDescription,
     };
-    data.removeWhere((_, value) => value == null);
+    data.removeWhere((_, value) {
+      if (value == null) return true;
+      if (value is String && value.trim().isEmpty) return true;
+      return false;
+    });
     return data;
   }
 
@@ -109,6 +121,8 @@ class RegisterResponseDto {
     required this.email,
     required this.role,
     required this.profileType,
+    this.communityId,
+    this.groupId,
   });
 
   final String id;
@@ -116,6 +130,8 @@ class RegisterResponseDto {
   final String email;
   final String role;
   final String profileType;
+  final String? communityId;
+  final String? groupId;
 
   factory RegisterResponseDto.fromJson(Map<String, dynamic> json) {
     return RegisterResponseDto(
@@ -124,6 +140,8 @@ class RegisterResponseDto {
       email: (json['email'] ?? '') as String,
       role: (json['role'] ?? '') as String,
       profileType: (json['profile_type'] ?? '') as String,
+      communityId: json['community_id']?.toString(),
+      groupId: json['group_id']?.toString(),
     );
   }
 }

@@ -124,7 +124,7 @@ class FeedPostsRepositoryImpl implements FeedPostsRepository {
         if (request.publishGroupId != null &&
             request.publishGroupId!.isNotEmpty)
           'publish_group_id': request.publishGroupId,
-        if (contentKind != null) 'content_kind': contentKind,
+        'content_kind': ?contentKind,
       },
       requiresAuth: true,
     );

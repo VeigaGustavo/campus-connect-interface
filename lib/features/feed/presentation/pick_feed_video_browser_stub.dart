@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-/// Mobile/desktop: seleciona vídeo via [ImagePicker].
 Future<({Uint8List bytes, String filename})?> pickFeedVideoBytes(
   BuildContext context,
 ) async {

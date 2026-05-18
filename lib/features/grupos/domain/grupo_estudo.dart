@@ -9,6 +9,7 @@ class StudyGroup {
     required this.level,
     required this.memberCount,
     required this.scheduleLabel,
+    this.visibility = 'public',
   });
 
   final String id;
@@ -18,4 +19,7 @@ class StudyGroup {
   final GroupLevel level;
   final int memberCount;
   final String scheduleLabel;
+  final String visibility;
+
+  bool get isPrivate => visibility == 'private';
 }

@@ -4,6 +4,7 @@ import 'package:campus_connect_interface/core/rede/excecao_api.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
 import 'package:campus_connect_interface/core/widgets/mensagem_erro_api.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/features/perfil/domain/perfil_usuario.dart';
 import 'package:campus_connect_interface/features/perfil/presentation/cartoes_secao_perfil.dart';
 import 'package:campus_connect_interface/features/perfil/presentation/editor_lista_tags_perfil.dart';
@@ -11,8 +12,6 @@ import 'package:campus_connect_interface/features/perfil/presentation/secao_foto
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Abre configurações do perfil como modal (ícone no cabeçalho).
-/// Devolve `true` se o perfil foi alterado (fotos ou PUT).
 Future<bool?> showProfileSettingsModal(BuildContext context) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -126,32 +125,17 @@ class _ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
         _dirty = false;
         _saving = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Perfil atualizado.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showFloatingSnackBar(context, 'Perfil atualizado.');
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Não foi possível salvar (${e.statusCode}).'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showApiErrorSnackBar(context, e);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao salvar: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showFloatingSnackBar(context, 'Erro ao salvar: $e');
       }
     }
   }
@@ -159,7 +143,9 @@ class _ProfileSettingsSheetState extends State<ProfileSettingsSheet> {
   Future<void> _logout() async {
     await LocalSessionStore.clear();
     if (!mounted) return;
-    DependencyScope.of(context).apiClient.clearAccessToken();
+    final deps = DependencyScope.of(context);
+    deps.apiClient.clearAccessToken();
+    deps.sessionRole.clear();
     if (mounted) context.go('/login');
   }
 

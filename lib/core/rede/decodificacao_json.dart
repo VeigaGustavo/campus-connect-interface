@@ -7,8 +7,6 @@ List<dynamic> decodeJsonList(dynamic decoded) {
   throw const FormatException('JSON inválido: esperado lista ou campo items');
 }
 
-/// Lista na raiz ou dentro de chaves comuns (`items`, `data`, `opportunities`, …).
-/// `null` ou objeto sem lista conhecida → lista vazia (telas de listagem).
 List<dynamic> decodeJsonListEnvelope(dynamic decoded) {
   if (decoded == null) return const [];
   if (decoded is List<dynamic>) return decoded;

@@ -103,7 +103,6 @@ class FeedPostDetail {
   }
 }
 
-/// Parâmetros de `GET /api/feed/posts`.
 class FeedPostsQuery {
   const FeedPostsQuery({
     this.page = 1,
@@ -136,7 +135,6 @@ class FeedPostsPage {
   final bool hasMore;
 }
 
-/// Tipo opcional do conteúdo. [FeedPostContentKind.simple] = post sem classificação.
 enum FeedPostContentKind {
   simple,
   article,
@@ -191,7 +189,6 @@ abstract class FeedPostsRepository {
   Future<void> setSaved(String postId, bool saved);
   Future<FeedPostDetail> createPost(CreatePostRequest request);
 
-  /// Envia ficheiro (imagem/vídeo) e devolve URL para incluir em [CreatePostRequest.attachments].
   Future<FeedAttachment> uploadAttachment({
     required List<int> bytes,
     required String filename,

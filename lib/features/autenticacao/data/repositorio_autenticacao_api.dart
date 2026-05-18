@@ -3,22 +3,6 @@ import 'package:campus_connect_interface/core/rede/contratos_auth.dart';
 import 'package:campus_connect_interface/core/rede/contratos_conteudo.dart';
 import 'package:campus_connect_interface/core/rede/excecao_api.dart';
 
-enum AuthActionErrorType {
-  unauthorized,
-  forbidden,
-  generic,
-}
-
-class AuthActionError implements Exception {
-  AuthActionError(
-    this.type, {
-    this.cause,
-  });
-
-  final AuthActionErrorType type;
-  final Object? cause;
-}
-
 class ApiAuthRepository {
   ApiAuthRepository(this._api);
 
@@ -75,12 +59,8 @@ class ApiAuthRepository {
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
         _api.clearAccessToken();
-        throw AuthActionError(AuthActionErrorType.unauthorized, cause: e);
       }
-      if (e.isForbidden) {
-        throw AuthActionError(AuthActionErrorType.forbidden, cause: e);
-      }
-      throw AuthActionError(AuthActionErrorType.generic, cause: e);
+      rethrow;
     }
   }
 }

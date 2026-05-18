@@ -2,7 +2,6 @@ import 'package:campus_connect_interface/features/perfil/presentation/modal_conf
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Rota legada: abre o mesmo conteúdo do modal e fecha ao sair.
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
 

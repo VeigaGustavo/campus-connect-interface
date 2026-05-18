@@ -2,6 +2,7 @@ import 'package:campus_connect_interface/core/configuracao/configuracao_api.dart
 import 'package:campus_connect_interface/core/rede/excecao_api.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/features/perfil/domain/repositorio_perfil.dart';
 import 'package:campus_connect_interface/features/perfil/presentation/pick_profile_image_browser.dart';
 import 'package:campus_connect_interface/features/perfil/presentation/tela_recorte_foto_perfil.dart';
@@ -10,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 const int _kMaxImageBytes = 6 * 1024 * 1024;
+const _kImagemGrandeMsg =
+    'Imagem muito grande. Escolha uma foto de até 6 MB.';
 
 String _mensagemErroUploadFoto(ApiException e, {required bool isAvatar}) {
   final path = isAvatar
@@ -27,6 +30,8 @@ String _mensagemErroUploadFoto(ApiException e, {required bool isAvatar}) {
   if (e.isUnauthorized) {
     return 'Sessão expirada. Faça login novamente.';
   }
+  final msg = e.userFacingOrBody.trim();
+  if (msg.isNotEmpty) return msg;
   return 'Não foi possível enviar a foto (${e.statusCode}).';
 }
 
@@ -83,10 +88,6 @@ void _hideBlockingLoader(BuildContext context) {
   if (nav.canPop()) nav.pop();
 }
 
-/// Na web o `image_picker` costuma falhar com MissingPluginException; o
-/// `file_picker` depende do registrador de plugins e também pode falhar
-/// (`LateInitializationError`). Usamos `<input type="file">` via `dart:html`
-/// (import condicional).
 Future<({Uint8List bytes, String filename})?> _pickImageBytes({
   required BuildContext context,
   required double maxWidth,
@@ -118,10 +119,19 @@ Future<({Uint8List bytes, String filename})?> _pickImageBytes({
   return (bytes: bytes, filename: name);
 }
 
-Future<bool> pickAndUploadProfileAvatar({
+bool _warnIfImageTooLarge(BuildContext context, List<int> bytes) {
+  if (bytes.length <= _kMaxImageBytes) return false;
+  showFloatingSnackBar(context, _kImagemGrandeMsg);
+  return true;
+}
+
+Future<bool> _pickCropAndUploadProfilePhoto({
   required BuildContext context,
   required ProfileRepository repo,
+  required TipoRecorteFotoPerfil tipo,
 }) async {
+  final isAvatar = tipo == TipoRecorteFotoPerfil.avatar;
+
   final picked = await _pickImageBytes(
     context: context,
     maxWidth: 4096,
@@ -129,70 +139,55 @@ Future<bool> pickAndUploadProfileAvatar({
     imageQuality: 92,
   );
   if (picked == null || !context.mounted) return false;
-
-  final bytes = picked.bytes;
-  if (bytes.length > _kMaxImageBytes) {
-    if (!context.mounted) return false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Imagem muito grande. Escolha uma foto de até 6 MB.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    return false;
-  }
+  if (_warnIfImageTooLarge(context, picked.bytes)) return false;
 
   final recortado = await mostrarTelaRecorteFotoPerfil(
     context,
-    imagemOriginal: bytes,
-    tipo: TipoRecorteFotoPerfil.avatar,
+    imagemOriginal: picked.bytes,
+    tipo: tipo,
   );
   if (recortado == null || !context.mounted) return false;
+  if (_warnIfImageTooLarge(context, recortado.bytes)) return false;
 
-  final bytesParaEnvio = recortado.bytes;
-  if (bytesParaEnvio.length > _kMaxImageBytes) {
-    if (!context.mounted) return false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Imagem muito grande. Escolha uma foto de até 6 MB.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    return false;
-  }
-
-  final name = recortado.filename.trim().isEmpty ? 'avatar.jpg' : recortado.filename;
+  final defaultName = isAvatar ? 'avatar.jpg' : 'cover.jpg';
+  final name =
+      recortado.filename.trim().isEmpty ? defaultName : recortado.filename;
   if (!context.mounted) return false;
+
   _showBlockingLoader(context);
   try {
-    await repo.uploadProfileAvatar(bytes: bytesParaEnvio, filename: name);
+    if (isAvatar) {
+      await repo.uploadProfileAvatar(
+        bytes: recortado.bytes,
+        filename: name,
+      );
+    } else {
+      await repo.uploadProfileCover(
+        bytes: recortado.bytes,
+        filename: name,
+      );
+    }
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Foto de perfil atualizada.'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      showFloatingSnackBar(
+        context,
+        isAvatar ? 'Foto de perfil atualizada.' : 'Foto de capa atualizada.',
       );
     }
     return true;
   } on ApiException catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_mensagemErroUploadFoto(e, isAvatar: true)),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 6),
-        ),
+      showFloatingSnackBar(
+        context,
+        _mensagemErroUploadFoto(e, isAvatar: isAvatar),
+        duration: const Duration(seconds: 6),
       );
     }
     return false;
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao enviar foto: $e'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      showFloatingSnackBar(
+        context,
+        'Erro ao enviar ${isAvatar ? 'foto' : 'capa'}: $e',
       );
     }
     return false;
@@ -200,91 +195,27 @@ Future<bool> pickAndUploadProfileAvatar({
     if (context.mounted) _hideBlockingLoader(context);
   }
 }
+
+Future<bool> pickAndUploadProfileAvatar({
+  required BuildContext context,
+  required ProfileRepository repo,
+}) =>
+    _pickCropAndUploadProfilePhoto(
+      context: context,
+      repo: repo,
+      tipo: TipoRecorteFotoPerfil.avatar,
+    );
 
 Future<bool> pickAndUploadProfileCover({
   required BuildContext context,
   required ProfileRepository repo,
-}) async {
-  final picked = await _pickImageBytes(
-    context: context,
-    maxWidth: 4096,
-    maxHeight: 4096,
-    imageQuality: 92,
-  );
-  if (picked == null || !context.mounted) return false;
-
-  final bytes = picked.bytes;
-  if (bytes.length > _kMaxImageBytes) {
-    if (!context.mounted) return false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Imagem muito grande. Escolha uma foto de até 6 MB.'),
-        behavior: SnackBarBehavior.floating,
-      ),
+}) =>
+    _pickCropAndUploadProfilePhoto(
+      context: context,
+      repo: repo,
+      tipo: TipoRecorteFotoPerfil.capa,
     );
-    return false;
-  }
 
-  final recortado = await mostrarTelaRecorteFotoPerfil(
-    context,
-    imagemOriginal: bytes,
-    tipo: TipoRecorteFotoPerfil.capa,
-  );
-  if (recortado == null || !context.mounted) return false;
-
-  final bytesParaEnvio = recortado.bytes;
-  if (bytesParaEnvio.length > _kMaxImageBytes) {
-    if (!context.mounted) return false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Imagem muito grande. Escolha uma foto de até 6 MB.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    return false;
-  }
-
-  final name = recortado.filename.trim().isEmpty ? 'cover.jpg' : recortado.filename;
-  if (!context.mounted) return false;
-  _showBlockingLoader(context);
-  try {
-    await repo.uploadProfileCover(bytes: bytesParaEnvio, filename: name);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Foto de capa atualizada.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-    return true;
-  } on ApiException catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_mensagemErroUploadFoto(e, isAvatar: false)),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 6),
-        ),
-      );
-    }
-    return false;
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao enviar capa: $e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-    return false;
-  } finally {
-    if (context.mounted) _hideBlockingLoader(context);
-  }
-}
-
-/// Blocos para alterar avatar e capa nas configurações do perfil.
 class ProfilePhotosSection extends StatefulWidget {
   const ProfilePhotosSection({
     super.key,

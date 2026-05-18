@@ -1,6 +1,8 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
 import 'package:campus_connect_interface/core/autenticacao/sessao_local.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
+import 'package:campus_connect_interface/core/rede/excecao_api.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/features/autenticacao/data/repositorio_autenticacao_api.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -41,12 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _email.text.trim();
     final senha = _password.text.trim();
     if (email.isEmpty || senha.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Preencha email e senha.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showFloatingSnackBar(context, 'Preencha email e senha.');
       return;
     }
     setState(() => _loading = true);
@@ -56,21 +53,12 @@ class _LoginScreenState extends State<LoginScreen> {
       final login = await authRepo.login(email: email, senha: senha);
       await LocalSessionStore.saveFromLogin(login);
       deps.apiClient.setAccessToken(login.accessToken);
+      deps.sessionRole.applyRole(login.role);
       if (!mounted) return;
       context.go('/home');
-    } on AuthActionError catch (e) {
+    } on ApiException catch (e) {
       if (!mounted) return;
-      final message = switch (e.type) {
-        AuthActionErrorType.unauthorized => 'Credenciais invalidas.',
-        AuthActionErrorType.forbidden => 'Seu perfil nao pode acessar.',
-        AuthActionErrorType.generic => 'Falha ao fazer login. Tente novamente.',
-      };
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showApiErrorSnackBar(context, e);
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -87,6 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final deps = DependencyScope.of(context);
     deps.apiClient.setAccessToken(session.accessToken);
+    deps.sessionRole.applyRole(session.role);
     _email.text = session.login;
     setState(() => _restoring = false);
     context.go('/home');

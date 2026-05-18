@@ -49,7 +49,6 @@ class CampusApiClient {
     return jsonDecode(body);
   }
 
-  /// `multipart/form-data` — não definir `Content-Type` manualmente (boundary automático).
   Future<dynamic> postMultipart(
     String path, {
     Map<String, String>? query,
@@ -273,13 +272,18 @@ class CampusApiClient {
     return _asJsonObjectOrEmpty(raw);
   }
 
-  Uri groupChatWsUri(String groupId) {
+  Uri groupChatWsUri(String groupId, {String? accessToken}) {
     final base = Uri.parse(_base);
     final wsScheme = base.scheme == 'https' ? 'wss' : 'ws';
+    final query = <String, String>{};
+    final token = accessToken ?? _accessToken;
+    if (token != null && token.isNotEmpty) {
+      query['access_token'] = token;
+    }
     return base.replace(
       scheme: wsScheme,
       path: '/api/groups/$groupId/chat/ws',
-      queryParameters: null,
+      queryParameters: query.isEmpty ? null : query,
     );
   }
 
@@ -436,6 +440,9 @@ class CampusApiClient {
 
   void _ensureSuccess(http.Response res) {
     if (res.statusCode >= 200 && res.statusCode < 300) return;
-    throw ApiException(statusCode: res.statusCode, body: res.body);
+    throw ApiException.fromResponse(
+      statusCode: res.statusCode,
+      body: res.body,
+    );
   }
 }

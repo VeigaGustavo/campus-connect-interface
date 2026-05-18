@@ -1,6 +1,7 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/barra_pesquisa_campus.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/features/feed/domain/repositorio_feed_posts.dart';
 import 'package:campus_connect_interface/features/feed/presentation/modal_criar_post_feed.dart';
 import 'package:campus_connect_interface/features/feed/presentation/widgets/cartao_post_feed_lista.dart';
@@ -33,7 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
   bool _initialLoadScheduled = false;
 
-  /// IDs reais de grupos do usuário (UUID). Vazio = só posts `publish_scope: all`.
   static const _myGroupIds = <String>[];
   static const _postsPageSize = 20;
 
@@ -144,7 +144,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _postsPage = page.page + 1;
       });
     } catch (_) {
-      // mantém lista atual
     } finally {
       if (mounted) setState(() => _loadingMorePosts = false);
     }
@@ -172,12 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted || postId == null) return;
     await _load(refresh: true);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Post publicado.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    showFloatingSnackBar(context, 'Post publicado.');
     context.push('/feed/posts/${Uri.encodeComponent(postId)}');
   }
 
@@ -202,13 +196,9 @@ class _HomeScreenState extends State<HomeScreen> {
       case HomeFeedKind.notice:
         break;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Este tipo ainda não possui detalhe por ID no app: ${item.title}',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
+    showFloatingSnackBar(
+      context,
+      'Este tipo ainda não possui detalhe por ID no app: ${item.title}',
     );
   }
 

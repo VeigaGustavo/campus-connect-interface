@@ -1,10 +1,13 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
+import 'package:campus_connect_interface/core/autorizacao/permissoes_interface.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
-
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/features/grupos/domain/nivel_grupo.dart';
 import 'package:campus_connect_interface/features/grupos/domain/grupo_estudo.dart';
+import 'package:campus_connect_interface/features/grupos/presentation/modal_criar_grupo.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class GroupsScreen extends StatefulWidget {
   const GroupsScreen({super.key});
@@ -15,6 +18,7 @@ class GroupsScreen extends StatefulWidget {
 
 class _GroupsScreenState extends State<GroupsScreen> {
   Future<List<StudyGroup>>? _future;
+  Object? _loadError;
 
   @override
   void didChangeDependencies() {
@@ -23,19 +27,51 @@ class _GroupsScreenState extends State<GroupsScreen> {
   }
 
   Future<List<StudyGroup>> _loadInitial() async {
-    return DependencyScope.of(context).groupsRepository.listGroups();
+    setState(() => _loadError = null);
+    try {
+      return await DependencyScope.of(context).groupsRepository.listGroups();
+    } catch (e) {
+      _loadError = e;
+      rethrow;
+    }
   }
 
   Future<void> _reload() async {
     final next = _loadInitial();
     setState(() => _future = next);
-    await next;
+    try {
+      await next;
+    } catch (_) {}
+  }
+
+  Future<void> _openCreateGroup() async {
+    final created = await showCreateStudyGroupModal(context);
+    if (created == true && mounted) {
+      await _reload();
+      if (!mounted) return;
+      showFloatingSnackBar(context, 'Grupo criado com sucesso.');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final canCreate =
+        UiPermissions.canManageGroups(DependencyScope.of(context).currentUserRole);
+
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: canCreate
+          ? FloatingActionButton.extended(
+              onPressed: _openCreateGroup,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Criar grupo',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            )
+          : null,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -71,7 +107,27 @@ class _GroupsScreenState extends State<GroupsScreen> {
                       snap.connectionState != ConnectionState.done) {
                     return const Center(child: CircularProgressIndicator());
                   }
+                  if (snap.hasError) {
+                    return _messageCenter(
+                      icon: Icons.cloud_off_outlined,
+                      title: 'Não foi possível carregar os grupos',
+                      subtitle: _loadError?.toString() ?? snap.error.toString(),
+                      action: FilledButton.icon(
+                        onPressed: _reload,
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        label: const Text('Tentar novamente'),
+                      ),
+                    );
+                  }
                   final items = snap.data ?? [];
+                  if (items.isEmpty) {
+                    return _messageCenter(
+                      icon: Icons.groups_2_outlined,
+                      title: 'Nenhum grupo disponível ainda',
+                      subtitle:
+                          'Grupos de atléticas e centros acadêmicos aparecem aqui após o cadastro da comunidade.',
+                    );
+                  }
                   return RefreshIndicator(
                     color: AppColors.primary,
                     onRefresh: _reload,
@@ -175,20 +231,28 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                 const SizedBox(height: 16),
                                 SizedBox(
                                   width: double.infinity,
-                                  child: ElevatedButton(
+                                  child: FilledButton.icon(
                                     onPressed: () {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Pedido para entrar em: ${g.title}',
-                                          ),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
+                                      if (g.isPrivate) {
+                                        showFloatingSnackBar(
+                                          context,
+                                          'Pedido de entrada enviado: ${g.title}',
+                                        );
+                                        return;
+                                      }
+                                      context.push('/groups/${g.id}', extra: g);
                                     },
-                                    child: const Text('Entrar no Grupo'),
+                                    icon: Icon(
+                                      g.isPrivate
+                                          ? Icons.lock_open_outlined
+                                          : Icons.login_rounded,
+                                      size: 20,
+                                    ),
+                                    label: Text(
+                                      g.isPrivate
+                                          ? 'Solicitar entrada'
+                                          : 'Entrar no grupo',
+                                    ),
                                   ),
                                 ),
                               ],
@@ -204,6 +268,45 @@ class _GroupsScreenState extends State<GroupsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _messageCenter({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    Widget? action,
+  }) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(28, 40, 28, 100),
+      children: [
+        Icon(icon, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.45)),
+        const SizedBox(height: 16),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.4,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        if (action != null) ...[
+          const SizedBox(height: 20),
+          Center(child: action),
+        ],
+      ],
     );
   }
 

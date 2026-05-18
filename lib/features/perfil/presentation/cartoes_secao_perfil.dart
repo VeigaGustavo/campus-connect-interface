@@ -3,7 +3,6 @@ import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart
 import 'package:campus_connect_interface/features/perfil/domain/perfil_usuario.dart';
 import 'package:flutter/material.dart';
 
-/// Rótulo de período/semestre para exibição no perfil.
 String formatProfilePeriodLabel(String raw) {
   final s = raw.trim();
   if (s.isEmpty) return '';
@@ -116,6 +115,105 @@ class ProfileAboutCard extends StatelessWidget {
   }
 }
 
+class ProfileCommunityAccountCard extends StatelessWidget {
+  const ProfileCommunityAccountCard({super.key, required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final panel = profile.organizationPanel;
+    final typeLabel = profile.communityTypeLabel;
+    final institution = panel?.parentInstitution?.trim() ?? '';
+
+    return SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.diversity_3_rounded, color: AppColors.primary, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Dados da comunidade',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (typeLabel != null)
+            _infoRow(
+              icon: Icons.category_outlined,
+              label: 'Tipo',
+              value: typeLabel,
+            ),
+          if (institution.isNotEmpty) ...[
+            if (typeLabel != null) const SizedBox(height: 10),
+            _infoRow(
+              icon: Icons.apartment_outlined,
+              label: 'Instituição vinculada',
+              value: institution,
+            ),
+          ],
+          if (typeLabel == null && institution.isEmpty)
+            Text(
+              'Tipo e instituição aparecem aqui quando a API enviar '
+              '`community_type` e `organization_panel.parent_institution`.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: AppColors.textSecondary.withValues(alpha: 0.9),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: AppColors.textSecondary.withValues(alpha: 0.85)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary.withValues(alpha: 0.85),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class ProfilePreferencesCard extends StatelessWidget {
   const ProfilePreferencesCard({super.key, required this.profile});
 
@@ -123,6 +221,10 @@ class ProfilePreferencesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (profile.profileType != AccountProfileType.estudante) {
+      return const SizedBox.shrink();
+    }
+
     return SoftCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,7 +545,6 @@ class ProfileActivityPanelCard extends StatelessWidget {
   }
 }
 
-/// Coluna estilo Kanban (Trello): cabeçalho + cartões empilhados verticalmente.
 class ProfileKanbanColumn extends StatelessWidget {
   const ProfileKanbanColumn({
     super.key,

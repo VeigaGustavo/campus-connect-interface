@@ -55,8 +55,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
     return MediaType('image', 'jpeg');
   }
 
-  /// Part único com bytes da imagem (nunca URL `blob:`). A API aceita também
-  /// `file` / `image`; usamos `avatar` e `cover` como no contrato do backend.
   static List<http.MultipartFile> _multipartProfileImageParts({
     required String fieldName,
     required List<int> bytes,
@@ -172,8 +170,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
         .toList(growable: false);
   }
 
-  /// Aceita lista JSON, `{ "items": [...] }` ou envelopes usuais (`data`, `history`, …).
-  /// Objeto sem lista conhecida vira lista vazia (evita derrubar o perfil).
   static List<dynamic> _decodeHistoryPayload(dynamic raw) {
     if (raw is List<dynamic>) return raw;
     if (raw is Map<String, dynamic>) {
@@ -246,6 +242,9 @@ class ProfileRepositoryImpl implements ProfileRepository {
       favoriteTopics: _mapStringList(j['favorite_topics']),
       specialties: _mapStringList(j['specialties']),
       communityHighlight: communityHighlight,
+      communityType: profileType == AccountProfileType.comunidade
+          ? _nullableNonEmptyString(j['community_type'])
+          : null,
       organizationPanel: organizationPanel,
     );
   }

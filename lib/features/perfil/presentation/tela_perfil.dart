@@ -81,7 +81,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     delegate: SliverChildListDelegate([
                       _StatsStrip(profile: p),
                       const SizedBox(height: 14),
-                      ProfilePreferencesCard(profile: p),
+                      if (p.profileType == AccountProfileType.estudante)
+                        ProfilePreferencesCard(profile: p),
+                      if (p.profileType == AccountProfileType.comunidade) ...[
+                        ProfileAboutCard(profile: p),
+                        const SizedBox(height: 14),
+                        ProfileCommunityAccountCard(profile: p),
+                      ] else if (p.isOrganizationProfile) ...[
+                        ProfileAboutCard(profile: p),
+                      ],
                       if (p.isOrganizationProfile) ...[
                         const SizedBox(height: 14),
                         OrganizationPanelCard(
@@ -559,7 +567,16 @@ class _ProfileHeader extends StatelessWidget {
 
               const SizedBox(height: 8),
               if (profile.isOrganizationProfile) ...[
-                _AccountTypeChip(label: profile.profileType.kindChipLabel),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _AccountTypeChip(label: profile.profileType.kindChipLabel),
+                    if (profile.profileType == AccountProfileType.comunidade &&
+                        profile.communityTypeLabel != null)
+                      _AccountTypeChip(label: profile.communityTypeLabel!),
+                  ],
+                ),
                 const SizedBox(height: 10),
               ],
               if (profile.jobTitle.trim().isNotEmpty) ...[

@@ -1,10 +1,10 @@
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:flutter/material.dart';
 
 const int kMaxProfileTagsPerList = 20;
 const int kMaxProfileTagLength = 50;
 
-/// Normaliza lista de etiquetas (contrato de perfil).
 List<String> normalizeProfileTagList(Iterable<String> raw) {
   final seen = <String>{};
   final out = <String>[];
@@ -22,8 +22,6 @@ List<String> normalizeProfileTagList(Iterable<String> raw) {
   return out;
 }
 
-/// Campo estilo LinkedIn: chips dentro da caixa; Enter ou vírgula adiciona; só
-/// persiste no servidor ao salvar o modal.
 class ProfileTagListEditor extends StatefulWidget {
   const ProfileTagListEditor({
     super.key,
@@ -32,6 +30,8 @@ class ProfileTagListEditor extends StatefulWidget {
     required this.tint,
     required this.onChanged,
     this.inputHint = 'Ex.: Flutter, APIs, UX',
+    this.helpText =
+        'Enter ou vírgula para adicionar. Remova com o ×. Salve no topo para publicar.',
   });
 
   final String title;
@@ -39,6 +39,7 @@ class ProfileTagListEditor extends StatefulWidget {
   final Color tint;
   final ValueChanged<List<String>> onChanged;
   final String inputHint;
+  final String helpText;
 
   @override
   State<ProfileTagListEditor> createState() => _ProfileTagListEditorState();
@@ -89,12 +90,10 @@ class _ProfileTagListEditorState extends State<ProfileTagListEditor> {
   void _notify() => widget.onChanged(List<String>.from(_items));
 
   void _showLimitMessage() {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(
-        content: Text('Limite de 20 itens (máx. 50 caracteres cada).'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
+    showFloatingSnackBarMaybe(
+      context,
+      'Limite de 20 itens (máx. 50 caracteres cada).',
+      duration: const Duration(seconds: 2),
     );
   }
 
@@ -107,12 +106,10 @@ class _ProfileTagListEditorState extends State<ProfileTagListEditor> {
     }
     final next = normalizeProfileTagList([..._items, t]);
     if (next.length == _items.length) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(
-          content: Text('Este item já está na lista.'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
-        ),
+      showFloatingSnackBarMaybe(
+        context,
+        'Este item já está na lista.',
+        duration: const Duration(seconds: 2),
       );
       return false;
     }
@@ -231,7 +228,7 @@ class _ProfileTagListEditorState extends State<ProfileTagListEditor> {
           children: [
             Expanded(
               child: Text(
-                'Enter ou vírgula para adicionar. Remova com o ×. Salve no topo para publicar.',
+                widget.helpText,
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.3,

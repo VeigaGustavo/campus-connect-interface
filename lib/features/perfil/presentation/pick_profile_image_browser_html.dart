@@ -22,12 +22,6 @@ Uint8List? _bytesFromFileReaderResult(Object? result) {
   }
 }
 
-/// Abre o seletor nativo do browser (`<input type="file">`) e devolve os bytes.
-///
-/// O fecho do diálogo do SO dispara `focus` antes de `change` em vários
-/// browsers; um timer curto sem cancelamento devolvia `null` e o ecrã de
-/// recorte nunca abria. O timer de “cancelamento” é cancelado em `change` e
-/// só assume cancelamento se `input.files` continuar vazio.
 Future<({Uint8List bytes, String filename})?> pickProfileImageInBrowser() async {
   final input = html.FileUploadInputElement()..accept = 'image/*';
 
@@ -103,8 +97,6 @@ Future<({Uint8List bytes, String filename})?> pickProfileImageInBrowser() async 
   return completer.future;
 }
 
-/// Redimensiona no motor de renderização do browser (assíncrono) para o Dart
-/// não bloquear a UI ao decodificar fotos muito grandes no `crop_your_image`.
 Future<Uint8List> shrinkProfileImageBytesForWeb(
   Uint8List raw, {
   int maxSide = 1680,

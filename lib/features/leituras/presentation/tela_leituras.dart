@@ -1,8 +1,11 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
+import 'package:campus_connect_interface/core/autorizacao/permissoes_interface.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/mensagem_erro_api.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
 import 'package:campus_connect_interface/features/leituras/domain/item_leitura_semanal.dart';
+import 'package:campus_connect_interface/features/leituras/presentation/modal_criar_leitura.dart';
 import 'package:flutter/material.dart';
 
 class ReadingScreen extends StatefulWidget {
@@ -14,6 +17,7 @@ class ReadingScreen extends StatefulWidget {
 
 class _ReadingScreenState extends State<ReadingScreen> {
   Future<List<WeeklyReadingItem>>? _future;
+  WeeklyReadingKind? _filterKind;
 
   @override
   void didChangeDependencies() {
@@ -21,8 +25,10 @@ class _ReadingScreenState extends State<ReadingScreen> {
     _future ??= _loadInitial();
   }
 
-  Future<List<WeeklyReadingItem>> _loadInitial() async {
-    return DependencyScope.of(context).readingRepository.getWeeklyHighlights();
+  Future<List<WeeklyReadingItem>> _loadInitial() {
+    return DependencyScope.of(context).readingRepository.getWeeklyHighlights(
+          kind: _filterKind,
+        );
   }
 
   Future<void> _reload() async {
@@ -31,11 +37,44 @@ class _ReadingScreenState extends State<ReadingScreen> {
     await next;
   }
 
+  void _setFilter(WeeklyReadingKind? kind) {
+    if (_filterKind == kind) return;
+    setState(() {
+      _filterKind = kind;
+      _future = _loadInitial();
+    });
+  }
+
+  Future<void> _openCreate() async {
+    final created = await showCreateWeeklyReadingModal(context);
+    if (created == true && mounted) {
+      await _reload();
+      if (!mounted) return;
+      showFloatingSnackBar(context, 'Leitura publicada com sucesso.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
+    final canCreate = UiPermissions.canManageReadings(
+      DependencyScope.of(context).currentUserRole,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: canCreate
+          ? FloatingActionButton.extended(
+              onPressed: _openCreate,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Nova leitura',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            )
+          : null,
       body: FutureBuilder<List<WeeklyReadingItem>>(
         future: _future,
         builder: (context, snap) {
@@ -100,7 +139,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                                   ),
                                   SizedBox(height: 4),
                                   Text(
-                                    'Notícias do campus, revistas, artigos e boletins em um só lugar.',
+                                    'Notícias do campus, revistas e artigos.',
                                     style: TextStyle(
                                       fontSize: 13,
                                       height: 1.35,
@@ -118,17 +157,34 @@ class _ReadingScreenState extends State<ReadingScreen> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _kindChip(
-                              WeeklyReadingKind.campusNews,
-                              Icons.newspaper_rounded,
+                            _kindFilterChip(
+                              label: 'Todas',
+                              selected: _filterKind == null,
+                              onTap: () => _setFilter(null),
                             ),
-                            _kindChip(
-                              WeeklyReadingKind.magazine,
-                              Icons.auto_stories_outlined,
+                            _kindFilterChip(
+                              label: WeeklyReadingKind.campusNews.labelPt,
+                              selected:
+                                  _filterKind == WeeklyReadingKind.campusNews,
+                              onTap: () =>
+                                  _setFilter(WeeklyReadingKind.campusNews),
+                              icon: Icons.newspaper_rounded,
                             ),
-                            _kindChip(
-                              WeeklyReadingKind.article,
-                              Icons.article_outlined,
+                            _kindFilterChip(
+                              label: WeeklyReadingKind.magazine.labelPt,
+                              selected:
+                                  _filterKind == WeeklyReadingKind.magazine,
+                              onTap: () =>
+                                  _setFilter(WeeklyReadingKind.magazine),
+                              icon: Icons.auto_stories_outlined,
+                            ),
+                            _kindFilterChip(
+                              label: WeeklyReadingKind.article.labelPt,
+                              selected:
+                                  _filterKind == WeeklyReadingKind.article,
+                              onTap: () =>
+                                  _setFilter(WeeklyReadingKind.article),
+                              icon: Icons.article_outlined,
                             ),
                           ],
                         ),
@@ -136,23 +192,40 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = items[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: _ReadingCard(
-                            item: item,
+                if (items.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Text(
+                          _filterKind == null
+                              ? 'Nenhuma leitura publicada ainda.'
+                              : 'Nenhuma leitura deste tipo.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textSecondary.withValues(alpha: 0.9),
                           ),
-                        );
-                      },
-                      childCount: items.length,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final item = items[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: _ReadingCard(item: item),
+                          );
+                        },
+                        childCount: items.length,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           );
@@ -161,39 +234,56 @@ class _ReadingScreenState extends State<ReadingScreen> {
     );
   }
 
-  Widget _kindChip(WeeklyReadingKind kind, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+  Widget _kindFilterChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.chipBorder.withValues(alpha: 0.85),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AppColors.primary),
-          const SizedBox(width: 6),
-          Text(
-            kind.labelPt,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.chipBorder,
             ),
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: 16,
+                  color: selected ? Colors.white : AppColors.primary,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class _ReadingCard extends StatelessWidget {
-  const _ReadingCard({
-    required this.item,
-  });
+  const _ReadingCard({required this.item});
 
   final WeeklyReadingItem item;
 
@@ -203,6 +293,8 @@ class _ReadingCard extends StatelessWidget {
         WeeklyReadingKind.article => const Color(0xFF059669),
       };
 
+  bool get _hasImage => item.imageUrl.trim().isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     return SoftCard(
@@ -210,46 +302,21 @@ class _ReadingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                item.imageUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Container(
-                    color: AppColors.chipBorder.withValues(alpha: 0.35),
-                    alignment: Alignment.center,
-                    child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary.withValues(alpha: 0.7),
-                        value: progress.expectedTotalBytes != null
-                            ? progress.cumulativeBytesLoaded /
-                                progress.expectedTotalBytes!
-                            : null,
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (_, _, _) => Container(
-                  color: _accent.withValues(alpha: 0.15),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    size: 40,
-                    color: _accent.withValues(alpha: 0.6),
-                  ),
+          if (_hasImage)
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Image.network(
+                  item.imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => _imagePlaceholder(),
                 ),
               ),
             ),
-          ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+            padding: EdgeInsets.fromLTRB(14, _hasImage ? 14 : 16, 14, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -341,33 +408,22 @@ class _ReadingCard extends StatelessWidget {
                     color: AppColors.textSecondary.withValues(alpha: 0.95),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Abrir leitura: ${item.title}'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                    label: const Text(
-                      'Ler agora',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _imagePlaceholder() {
+    return Container(
+      color: _accent.withValues(alpha: 0.15),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        size: 40,
+        color: _accent.withValues(alpha: 0.6),
       ),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Em debug, registra metodo, URL e status no console (nao aparece na aba Rede do IDE).
 class LoggingHttpClient extends http.BaseClient {
   LoggingHttpClient(this._inner);
 

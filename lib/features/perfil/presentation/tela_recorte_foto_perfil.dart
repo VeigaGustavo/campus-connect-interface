@@ -1,14 +1,11 @@
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// Destino do recorte (define proporção e forma da área).
 enum TipoRecorteFotoPerfil {
-  /// Área circular 1:1 (export PNG com transparência nas pontas).
   avatar,
-
-  /// Faixa larga tipo banner (~2,7:1).
   capa,
 }
 
@@ -26,11 +23,6 @@ String _extensaoPorAssinatura(Uint8List bytes) {
   return 'jpg';
 }
 
-/// Abre ecrã inteiro para ajustar zoom/posição antes de enviar ao servidor.
-///
-/// Usa o [Navigator] raiz (GoRouter + shell) para o ecrã aparecer por cima de
-/// tudo. Após o seletor nativo de ficheiros na web, adia um frame para o
-/// `Navigator.push` não ser engolido pelo ciclo de foco do browser.
 Future<({Uint8List bytes, String filename})?> mostrarTelaRecorteFotoPerfil(
   BuildContext context, {
   required Uint8List imagemOriginal,
@@ -106,11 +98,9 @@ class _TelaRecorteFotoPerfilState extends State<_TelaRecorteFotoPerfil> {
         );
       case CropFailure(:final cause):
         setState(() => _aProcessarRecorte = false);
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(
-            content: Text('Não foi possível recortar: $cause'),
-            behavior: SnackBarBehavior.floating,
-          ),
+        showFloatingSnackBarMaybe(
+          context,
+          'Não foi possível recortar: $cause',
         );
     }
   }

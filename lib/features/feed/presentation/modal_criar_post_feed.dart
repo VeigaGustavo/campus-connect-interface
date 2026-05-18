@@ -3,12 +3,12 @@ import 'dart:typed_data';
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
 import 'package:campus_connect_interface/core/rede/excecao_api.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
 import 'package:campus_connect_interface/features/feed/domain/repositorio_feed_posts.dart';
 import 'package:campus_connect_interface/features/feed/presentation/seletor_midia_post_feed.dart';
 import 'package:flutter/material.dart';
 
-/// Abre modal para criar post. Retorna o `id` do post criado ou `null` se cancelado.
 Future<String?> showCreateFeedPostModal(BuildContext context) {
   return showModalBottomSheet<String>(
     context: context,
@@ -64,9 +64,7 @@ class _CreateFeedPostSheetState extends State<CreateFeedPostSheet> {
       assertAttachmentSize(FeedAttachmentType.image, picked.bytes.length);
     } on FormatException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
-      );
+      showFloatingSnackBar(context, e.message);
       return;
     }
     await _uploadBytes(
@@ -85,9 +83,7 @@ class _CreateFeedPostSheetState extends State<CreateFeedPostSheet> {
       assertAttachmentSize(FeedAttachmentType.video, picked.bytes.length);
     } on FormatException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
-      );
+      showFloatingSnackBar(context, e.message);
       return;
     }
     await _uploadBytes(
@@ -133,20 +129,10 @@ class _CreateFeedPostSheetState extends State<CreateFeedPostSheet> {
       });
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Falha no upload (${e.statusCode}).'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showApiErrorSnackBar(context, e);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showFloatingSnackBar(context, '$e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -155,11 +141,9 @@ class _CreateFeedPostSheetState extends State<CreateFeedPostSheet> {
   Future<void> _submit() async {
     final text = _textController.text.trim();
     if (text.isEmpty && _attachments.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Escreva um texto ou adicione um anexo.'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      showFloatingSnackBar(
+        context,
+        'Escreva um texto ou adicione um anexo.',
       );
       return;
     }
@@ -179,24 +163,10 @@ class _CreateFeedPostSheetState extends State<CreateFeedPostSheet> {
       Navigator.of(context).pop(post.id);
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.isUnauthorized
-                ? 'Faça login para publicar.'
-                : 'Não foi possível publicar (${e.statusCode}).',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showApiErrorSnackBar(context, e);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao publicar: $e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showFloatingSnackBar(context, 'Erro ao publicar: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

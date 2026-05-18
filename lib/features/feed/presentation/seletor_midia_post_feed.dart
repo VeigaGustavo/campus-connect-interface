@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:campus_connect_interface/features/feed/domain/repositorio_feed_posts.dart';
 import 'package:campus_connect_interface/features/feed/presentation/pick_feed_video_browser.dart';
 import 'package:campus_connect_interface/features/perfil/presentation/pick_profile_image_browser.dart';
@@ -11,7 +9,6 @@ import 'package:image_picker/image_picker.dart';
 const int kMaxPostImageBytes = 8 * 1024 * 1024;
 const int kMaxPostVideoBytes = 80 * 1024 * 1024;
 
-/// Anexo pronto para enviar no POST do post (URL já resolvida ou link externo).
 class PostAttachmentDraft {
   const PostAttachmentDraft({
     required this.type,

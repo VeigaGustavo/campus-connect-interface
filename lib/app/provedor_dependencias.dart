@@ -1,3 +1,4 @@
+import 'package:campus_connect_interface/core/autenticacao/papel_sessao_usuario.dart';
 import 'package:campus_connect_interface/core/configuracao/configuracao_api.dart';
 import 'package:campus_connect_interface/core/rede/cliente_http_log.dart';
 import 'package:campus_connect_interface/core/rede/contratos_conteudo.dart';
@@ -21,15 +22,19 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class CampusDependencies {
-  factory CampusDependencies({CampusApiClient? apiClient}) {
+  factory CampusDependencies({
+    CampusApiClient? apiClient,
+    UserSessionRole? sessionRole,
+  }) {
     final client = apiClient ??
         CampusApiClient(
           baseUrl: ApiConfig.baseUrl,
           httpClient: kDebugMode ? LoggingHttpClient(http.Client()) : null,
         );
+    final roleHolder = sessionRole ?? UserSessionRole();
     return CampusDependencies._(
       apiClient: client,
-      currentUserRole: ApiConfig.debugUserRole,
+      sessionRole: roleHolder,
       homeFeedRepository: HomeFeedRepositoryImpl(client),
       opportunitiesRepository: OpportunitiesRepositoryImpl(client),
       eventsRepository: EventsRepositoryImpl(client),
@@ -42,7 +47,7 @@ class CampusDependencies {
 
   const CampusDependencies._({
     required this.apiClient,
-    required this.currentUserRole,
+    required this.sessionRole,
     required this.homeFeedRepository,
     required this.opportunitiesRepository,
     required this.eventsRepository,
@@ -53,7 +58,7 @@ class CampusDependencies {
   });
 
   final CampusApiClient apiClient;
-  final AppUserRole currentUserRole;
+  final UserSessionRole sessionRole;
   final HomeFeedRepository homeFeedRepository;
   final OpportunitiesRepository opportunitiesRepository;
   final EventsRepository eventsRepository;
@@ -61,6 +66,8 @@ class CampusDependencies {
   final FeedPostsRepository feedPostsRepository;
   final ProfileRepository profileRepository;
   final ReadingRepository readingRepository;
+
+  AppUserRole get currentUserRole => sessionRole.current;
 }
 
 class DependencyScope extends InheritedWidget {
@@ -79,5 +86,6 @@ class DependencyScope extends InheritedWidget {
   }
 
   @override
-  bool updateShouldNotify(covariant InheritedWidget oldWidget) => false;
+  bool updateShouldNotify(covariant DependencyScope oldWidget) =>
+      oldWidget.deps.sessionRole != deps.sessionRole;
 }

@@ -1,9 +1,7 @@
-/// Contexto do perfil na API v2 (`GET/PUT /api/profile`): pessoa vs instituição.
 enum ProfileContext {
   user,
   organization;
 
-  /// Aceita `profile_context` da API; se ausente, infere por `profile_type` legado.
   static ProfileContext fromApi(
     dynamic raw, {
     AccountProfileType? legacyProfileType,
@@ -24,8 +22,6 @@ enum ProfileContext {
   }
 }
 
-/// Papel da conta na UI (comunidade / empresa / universidade) — alinhado ao `role` do JWT
-/// quando a API o espelha no JSON; senão usa `profile_type` legado.
 enum AccountProfileType {
   estudante,
   comunidade,
@@ -42,7 +38,6 @@ enum AccountProfileType {
     };
   }
 
-  /// Monta o tipo de UI a partir do contrato v2 (`profile_context` + `role` / `profile_type`).
   static AccountProfileType fromProfilePayload({
     required ProfileContext profileContext,
     dynamic role,
@@ -98,12 +93,37 @@ enum AccountProfileType {
       ? 'Sobre a instituição, preferências e atividade.'
       : 'Sobre você, preferências e painel de atividade.';
 
-  String get aboutCardTitle =>
-      isInstitution ? 'Sobre a instituição' : 'Sobre mim';
+  String get aboutCardTitle => switch (this) {
+        AccountProfileType.estudante => 'Sobre mim',
+        AccountProfileType.comunidade => 'Sobre a comunidade',
+        AccountProfileType.empresa => 'Sobre a empresa',
+        AccountProfileType.universidade => 'Sobre a universidade',
+      };
 
-  String get emptyAboutFallback => isInstitution
-      ? 'Sem descrição institucional no momento.'
-      : 'Sem descrição no momento.';
+  String get organizationPanelTitle => switch (this) {
+        AccountProfileType.comunidade => 'Painel da comunidade',
+        AccountProfileType.empresa => 'Painel da empresa',
+        AccountProfileType.universidade => 'Painel da universidade',
+        _ => 'Painel da organização',
+      };
+
+  String get emptyAboutFallback => switch (this) {
+        AccountProfileType.estudante => 'Sem descrição no momento.',
+        AccountProfileType.comunidade =>
+          'Sem descrição da comunidade no momento.',
+        _ => 'Sem descrição institucional no momento.',
+      };
+
+  static String? labelForCommunityType(String? raw) {
+    final t = raw?.trim().toLowerCase();
+    if (t == null || t.isEmpty) return null;
+    return switch (t) {
+      'atletica' || 'athletic' => 'Atlética',
+      'ca' || 'academic_center' => 'Centro Acadêmico',
+      'community' => 'Comunidade',
+      _ => raw!.trim(),
+    };
+  }
 
   String get preferencesSubtitle => isInstitution
       ? 'Temas, eixos de atuação e competências exibidos ao público.'
@@ -152,7 +172,6 @@ class ProfileHistoryItem {
   final DateTime createdAt;
 }
 
-/// Item de listagem em `organization_panel` (vagas, eventos, grupos).
 class OrganizationPanelListedItem {
   const OrganizationPanelListedItem({
     required this.id,
@@ -169,7 +188,6 @@ class OrganizationPanelListedItem {
   final DateTime createdAt;
 }
 
-/// Post resumido em `organization_panel.posts`.
 class OrganizationPanelPost {
   const OrganizationPanelPost({
     required this.id,
@@ -182,7 +200,6 @@ class OrganizationPanelPost {
   final DateTime createdAt;
 }
 
-/// Painel agregado para `profile_context: organization` (contrato v2).
 class OrganizationPanel {
   const OrganizationPanel({
     this.parentInstitution,
@@ -227,7 +244,6 @@ class ProfileUpdateInput {
   final String course;
   final String semester;
   final String institutionName;
-  /// Apenas universidade no `PUT /api/profile`; outros perfis ignoram.
   final String mapUrl;
   final List<String> interests;
   final List<String> favoriteTopics;
@@ -256,6 +272,7 @@ class UserProfile {
     required this.favoriteTopics,
     required this.specialties,
     required this.communityHighlight,
+    this.communityType,
     this.organizationPanel,
   });
 
@@ -280,10 +297,13 @@ class UserProfile {
   final List<String> specialties;
   final CommunityHighlight? communityHighlight;
 
-  /// Presente em modo organização; `null` em contas `user` ou API sem bloco.
+  final String? communityType;
+
   final OrganizationPanel? organizationPanel;
 
-  /// Contrato v2: `profile_context == "organization"` — perfil da instituição.
+  String? get communityTypeLabel =>
+      AccountProfileType.labelForCommunityType(communityType);
+
   bool get isOrganizationProfile =>
       profileContext == ProfileContext.organization;
 
@@ -312,6 +332,7 @@ class UserProfile {
       favoriteTopics: favoriteTopics,
       specialties: specialties,
       communityHighlight: communityHighlight,
+      communityType: communityType,
       organizationPanel: organizationPanel,
     );
   }

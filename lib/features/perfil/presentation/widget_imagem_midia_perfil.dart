@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Avatar/capa do perfil: evita `Image.network('')` e força rebuild quando a URL muda.
 class ProfileMediaImage extends StatelessWidget {
   const ProfileMediaImage({
     super.key,

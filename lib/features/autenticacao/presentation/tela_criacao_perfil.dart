@@ -1,9 +1,9 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
-import 'package:campus_connect_interface/core/autenticacao/validacao_senha.dart';
 import 'package:campus_connect_interface/core/rede/contratos_auth.dart';
+import 'package:campus_connect_interface/core/rede/excecao_api.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
-import 'package:campus_connect_interface/core/widgets/indicador_forca_senha.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/features/autenticacao/data/repositorio_autenticacao_api.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -16,8 +16,6 @@ class ProfileCreationScreen extends StatefulWidget {
 }
 
 class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
-  final _formKey = GlobalKey<FormState>();
-
   RegisterProfileType _type = RegisterProfileType.estudante;
 
   final _nomeCompleto = TextEditingController();
@@ -32,7 +30,9 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   final _passwordConfirm = TextEditingController();
 
   final _nomeComunidade = TextEditingController();
+  final _descricaoComunidade = TextEditingController();
   String _tipoComunidade = 'atletica';
+  String _visibilidadeGrupo = 'public';
 
   final _nomeEmpresa = TextEditingController();
   final _cnpjEmpresa = TextEditingController();
@@ -45,17 +45,8 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   bool _obscurePassword = true;
   bool _obscurePasswordConfirm = true;
 
-  void _onPasswordChanged() => setState(() {});
-
-  @override
-  void initState() {
-    super.initState();
-    _password.addListener(_onPasswordChanged);
-  }
-
   @override
   void dispose() {
-    _password.removeListener(_onPasswordChanged);
     _nomeCompleto.dispose();
     _birthDateLabel.dispose();
     _cpf.dispose();
@@ -66,6 +57,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     _password.dispose();
     _passwordConfirm.dispose();
     _nomeComunidade.dispose();
+    _descricaoComunidade.dispose();
     _nomeEmpresa.dispose();
     _cnpjEmpresa.dispose();
     _descricaoEmpresa.dispose();
@@ -77,15 +69,20 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   }
 
   Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
     final deps = DependencyScope.of(context);
     final repo = ApiAuthRepository(deps.apiClient);
+    final institution = switch (_type) {
+      RegisterProfileType.estudante => _instituicao.text.trim(),
+      RegisterProfileType.comunidade => _instituicao.text.trim(),
+      RegisterProfileType.universidade => _nomeInstituicao.text.trim(),
+      RegisterProfileType.empresa => '',
+    };
     final dto = RegisterRequestDto(
       profileType: _type,
       fullName: _nomeCompleto.text.trim(),
-      birthDate: _birthDate!,
+      birthDate: _birthDate,
       cpf: _cpf.text.trim(),
-      institution: _instituicao.text.trim(),
+      institution: institution,
       city: _cidade.text.trim(),
       state: _estado.text.trim(),
       email: _email.text.trim(),
@@ -93,6 +90,12 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
       communityType: _type == RegisterProfileType.comunidade ? _tipoComunidade : null,
       communityName: _type == RegisterProfileType.comunidade
           ? _nomeComunidade.text.trim()
+          : null,
+      groupDescription: _type == RegisterProfileType.comunidade
+          ? _descricaoComunidade.text.trim()
+          : null,
+      groupVisibility: _type == RegisterProfileType.comunidade
+          ? _visibilidadeGrupo
           : null,
       companyName: _type == RegisterProfileType.empresa
           ? _nomeEmpresa.text.trim()
@@ -120,26 +123,11 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     try {
       await repo.register(dto);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Perfil criado com sucesso.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showFloatingSnackBar(context, 'Perfil criado com sucesso.');
       context.go('/login');
-    } on AuthActionError catch (e) {
+    } on ApiException catch (e) {
       if (!mounted) return;
-      final message = switch (e.type) {
-        AuthActionErrorType.forbidden =>
-          'Seu perfil nao pode executar esta acao.',
-        AuthActionErrorType.unauthorized =>
-          'Sessao invalida. Faça login novamente.',
-        AuthActionErrorType.generic =>
-          'Nao foi possivel criar o perfil. Tente novamente.',
-      };
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-      );
+      showApiErrorSnackBar(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -150,6 +138,17 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
         RegisterProfileType.comunidade => 'Criar perfil de admin da comunidade',
         RegisterProfileType.empresa => 'Criar perfil de empresa',
         RegisterProfileType.universidade => 'Criar perfil de universidade',
+      };
+
+  String get _instrucao => switch (_type) {
+        RegisterProfileType.estudante =>
+          'Preencha seus dados acadêmicos e de acesso.',
+        RegisterProfileType.comunidade =>
+          'Cadastre a comunidade, a instituição vinculada e o administrador.',
+        RegisterProfileType.empresa =>
+          'Cadastre a empresa e o responsável pela conta.',
+        RegisterProfileType.universidade =>
+          'Cadastre a instituição de ensino e o administrador.',
       };
 
   String _formatDateBr(DateTime d) {
@@ -283,9 +282,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                       const SizedBox(height: 20),
                       SoftCard(
                         padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
+                        child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Row(
@@ -348,61 +345,15 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Preencha os dados para concluir seu cadastro.',
+                                _instrucao,
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: AppColors.textSecondary,
                                   height: 1.35,
                                 ),
                               ),
                               const SizedBox(height: 18),
-                              _field(
-                                _nomeCompleto,
-                                'Nome completo',
-                                icon: Icons.person_outline_rounded,
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _birthDateLabel,
-                                readOnly: true,
-                                onTap: () {
-                                  FocusScope.of(context).unfocus();
-                                  _pickBirthDate();
-                                },
-                                decoration: _decoration(
-                                  'Data de nascimento',
-                                  icon: Icons.calendar_month_outlined,
-                                ).copyWith(
-                                  hintText: 'Toque para escolher',
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(Icons.event_rounded),
-                                    color: AppColors.primary,
-                                    onPressed: () {
-                                      FocusScope.of(context).unfocus();
-                                      _pickBirthDate();
-                                    },
-                                    tooltip: 'Escolher data',
-                                  ),
-                                ),
-                                validator: (_) {
-                                  if (_birthDate == null) {
-                                    return 'Informe a data de nascimento';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              _field(
-                                _cpf,
-                                'CPF',
-                                keyboard: TextInputType.number,
-                                icon: Icons.badge_outlined,
-                              ),
-                              const SizedBox(height: 12),
-                              _field(
-                                _instituicao,
-                                'Instituição',
-                                icon: Icons.school_outlined,
-                              ),
+                              ..._buildProfileTypeFields(),
+                              _sectionTitle('Localização e acesso'),
                               const SizedBox(height: 12),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,7 +383,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                                 icon: Icons.alternate_email_rounded,
                               ),
                               const SizedBox(height: 12),
-                              TextFormField(
+                              TextField(
                                 controller: _password,
                                 obscureText: _obscurePassword,
                                 decoration: _decoration(
@@ -454,25 +405,9 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                                     ),
                                   ),
                                 ),
-                                validator: (v) {
-                                  final p = v?.trim() ?? '';
-                                  if (p.isEmpty) {
-                                    return 'Campo obrigatorio';
-                                  }
-                                  final a = PasswordStrength.analyze(p);
-                                  if (!a.isStrong) {
-                                    return 'Use uma senha forte (veja os requisitos abaixo)';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              PasswordStrengthPanel(
-                                analysis:
-                                    PasswordStrength.analyze(_password.text),
                               ),
                               const SizedBox(height: 14),
-                              TextFormField(
+                              TextField(
                                 controller: _passwordConfirm,
                                 obscureText: _obscurePasswordConfirm,
                                 decoration: _decoration(
@@ -495,97 +430,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                                     ),
                                   ),
                                 ),
-                                validator: (v) {
-                                  final c = v?.trim() ?? '';
-                                  if (c.isEmpty) {
-                                    return 'Confirme sua senha';
-                                  }
-                                  if (c != _password.text) {
-                                    return 'As senhas não coincidem';
-                                  }
-                                  return null;
-                                },
                               ),
-                              if (_type == RegisterProfileType.comunidade) ...[
-                                const SizedBox(height: 12),
-                                _field(
-                                  _nomeComunidade,
-                                  'Nome da comunidade',
-                                  icon: Icons.diversity_3_outlined,
-                                ),
-                                const SizedBox(height: 12),
-                                DropdownButtonFormField<String>(
-                                  initialValue: _tipoComunidade,
-                                  onChanged: (v) => setState(
-                                    () => _tipoComunidade = v ?? 'atletica',
-                                  ),
-                                  decoration: _decoration(
-                                    'Tipo da comunidade',
-                                    icon: Icons.category_outlined,
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'atletica',
-                                      child: Text('Atlética'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'ca',
-                                      child: Text('Centro Acadêmico'),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              if (_type == RegisterProfileType.empresa) ...[
-                                const SizedBox(height: 12),
-                                _field(
-                                  _nomeEmpresa,
-                                  'Nome da empresa',
-                                  icon: Icons.apartment_outlined,
-                                ),
-                                const SizedBox(height: 12),
-                                _field(
-                                  _cnpjEmpresa,
-                                  'CNPJ (opcional)',
-                                  required: false,
-                                  icon: Icons.numbers_rounded,
-                                ),
-                                const SizedBox(height: 12),
-                                _field(
-                                  _descricaoEmpresa,
-                                  'Descrição da empresa (opcional)',
-                                  required: false,
-                                  icon: Icons.description_outlined,
-                                ),
-                              ],
-                              if (_type == RegisterProfileType.universidade) ...[
-                                const SizedBox(height: 12),
-                                _field(
-                                  _nomeInstituicao,
-                                  'Nome da instituição',
-                                  icon: Icons.account_balance_outlined,
-                                ),
-                                const SizedBox(height: 12),
-                                _field(
-                                  _siglaInstituicao,
-                                  'Sigla (opcional)',
-                                  required: false,
-                                  icon: Icons.abc_outlined,
-                                ),
-                                const SizedBox(height: 12),
-                                _field(
-                                  _tipoInstituicao,
-                                  'Tipo (opcional)',
-                                  required: false,
-                                  icon: Icons.label_outline_rounded,
-                                ),
-                                const SizedBox(height: 12),
-                                _field(
-                                  _descricaoInstituicao,
-                                  'Descrição da instituição (opcional)',
-                                  required: false,
-                                  icon: Icons.article_outlined,
-                                ),
-                              ],
                               const SizedBox(height: 24),
                               FilledButton(
                                 onPressed: _loading ? null : _submit,
@@ -659,7 +504,6 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                               ),
                             ],
                           ),
-                        ),
                       ),
                     ],
                   ),
@@ -671,6 +515,252 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
       ),
     );
   }
+
+  List<Widget> _buildProfileTypeFields() {
+    return switch (_type) {
+      RegisterProfileType.estudante => _buildStudentFields(),
+      RegisterProfileType.comunidade => [
+          ..._buildComunidadeFields(),
+          const SizedBox(height: 20),
+          ..._buildAdminFields(),
+        ],
+      RegisterProfileType.empresa => [
+          ..._buildEmpresaFields(),
+          const SizedBox(height: 20),
+          ..._buildAdminFields(),
+        ],
+      RegisterProfileType.universidade => [
+          ..._buildUniversidadeFields(),
+          const SizedBox(height: 20),
+          ..._buildAdminFields(),
+        ],
+    };
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+      ),
+    );
+  }
+
+  List<Widget> _buildStudentFields() => [
+        _field(
+          _nomeCompleto,
+          'Nome completo',
+          icon: Icons.person_outline_rounded,
+        ),
+        const SizedBox(height: 12),
+        _buildBirthDateField(),
+        const SizedBox(height: 12),
+        _field(
+          _cpf,
+          'CPF',
+          keyboard: TextInputType.number,
+          icon: Icons.badge_outlined,
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _instituicao,
+          'Instituição de ensino',
+          icon: Icons.school_outlined,
+        ),
+        const SizedBox(height: 20),
+      ];
+
+  List<Widget> _buildAdminFields() => [
+        _sectionTitle(
+          _type == RegisterProfileType.comunidade
+              ? 'Administrador da comunidade'
+              : 'Responsável pela conta',
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _nomeCompleto,
+          'Nome completo',
+          icon: Icons.person_outline_rounded,
+        ),
+        const SizedBox(height: 12),
+        _buildBirthDateField(),
+        const SizedBox(height: 12),
+        _field(
+          _cpf,
+          'CPF',
+          keyboard: TextInputType.number,
+          icon: Icons.badge_outlined,
+        ),
+        const SizedBox(height: 20),
+      ];
+
+  Widget _buildBirthDateField() {
+    return TextField(
+      controller: _birthDateLabel,
+      readOnly: true,
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        _pickBirthDate();
+      },
+      decoration: _decoration(
+        'Data de nascimento',
+        icon: Icons.calendar_month_outlined,
+      ).copyWith(
+        hintText: 'Toque para escolher',
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.event_rounded),
+          color: AppColors.primary,
+          onPressed: () {
+            FocusScope.of(context).unfocus();
+            _pickBirthDate();
+          },
+          tooltip: 'Escolher data',
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildComunidadeFields() => [
+        _sectionTitle('Comunidade'),
+        const SizedBox(height: 12),
+        _field(
+          _nomeComunidade,
+          'Nome da comunidade',
+          icon: Icons.diversity_3_outlined,
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: _tipoComunidade,
+          onChanged: (v) => setState(() => _tipoComunidade = v ?? 'atletica'),
+          decoration: _decoration(
+            'Tipo da comunidade',
+            icon: Icons.category_outlined,
+          ),
+          items: const [
+            DropdownMenuItem(value: 'atletica', child: Text('Atlética')),
+            DropdownMenuItem(
+              value: 'ca',
+              child: Text('Centro Acadêmico'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _descricaoComunidade,
+          'Descrição da comunidade',
+          maxLines: 3,
+          icon: Icons.notes_outlined,
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _instituicao,
+          'Instituição vinculada',
+          icon: Icons.apartment_outlined,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            'O grupo principal é criado automaticamente com este cadastro.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Visibilidade do grupo',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+        ),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(
+              value: 'public',
+              label: Text('Público'),
+              icon: Icon(Icons.public_outlined, size: 18),
+            ),
+            ButtonSegment(
+              value: 'private',
+              label: Text('Privado'),
+              icon: Icon(Icons.lock_outline, size: 18),
+            ),
+          ],
+          selected: {_visibilidadeGrupo},
+          onSelectionChanged: (s) =>
+              setState(() => _visibilidadeGrupo = s.first),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _visibilidadeGrupo == 'public'
+              ? 'Qualquer pessoa pode entrar direto.'
+              : 'Novos membros precisam de aprovação.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+        ),
+        const SizedBox(height: 20),
+      ];
+
+  List<Widget> _buildEmpresaFields() => [
+        _sectionTitle('Empresa'),
+        const SizedBox(height: 12),
+        _field(
+          _nomeEmpresa,
+          'Nome da empresa',
+          icon: Icons.business_outlined,
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _cnpjEmpresa,
+          'CNPJ (opcional)',
+          icon: Icons.numbers_rounded,
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _descricaoEmpresa,
+          'Descrição da empresa (opcional)',
+          maxLines: 3,
+          icon: Icons.description_outlined,
+        ),
+        const SizedBox(height: 20),
+      ];
+
+  List<Widget> _buildUniversidadeFields() => [
+        _sectionTitle('Instituição de ensino'),
+        const SizedBox(height: 12),
+        _field(
+          _nomeInstituicao,
+          'Nome da instituição',
+          icon: Icons.account_balance_outlined,
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _siglaInstituicao,
+          'Sigla (opcional)',
+          icon: Icons.abc_outlined,
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _tipoInstituicao,
+          'Tipo (opcional)',
+          hint: 'Ex.: federal, estadual',
+          icon: Icons.label_outline_rounded,
+        ),
+        const SizedBox(height: 12),
+        _field(
+          _descricaoInstituicao,
+          'Descrição (opcional)',
+          maxLines: 3,
+          icon: Icons.article_outlined,
+        ),
+        const SizedBox(height: 20),
+      ];
 
   Widget _typeSelector() {
     return LayoutBuilder(
@@ -809,34 +899,25 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     TextEditingController controller,
     String label, {
     TextInputType keyboard = TextInputType.text,
-    bool required = true,
     bool obscure = false,
     IconData? icon,
+    String? hint,
+    int maxLines = 1,
   }) {
-    return TextFormField(
+    return TextField(
       controller: controller,
       keyboardType: keyboard,
       obscureText: obscure,
-      decoration: _decoration(label, icon: icon),
-      validator: (v) {
-        if (required && (v == null || v.trim().isEmpty)) {
-          return 'Campo obrigatorio';
-        }
-        if (label.startsWith('E-mail') &&
-            v != null &&
-            v.isNotEmpty &&
-            !v.contains('@')) {
-          return 'Informe um email valido';
-        }
-        return null;
-      },
+      maxLines: maxLines,
+      decoration: _decoration(label, icon: icon, hint: hint),
     );
   }
 
-  InputDecoration _decoration(String label, {IconData? icon}) {
+  InputDecoration _decoration(String label, {IconData? icon, String? hint}) {
     final scheme = Theme.of(context).colorScheme;
     return InputDecoration(
       labelText: label,
+      hintText: hint,
       alignLabelWithHint: true,
       filled: true,
       fillColor: AppColors.background.withValues(alpha: 0.65),

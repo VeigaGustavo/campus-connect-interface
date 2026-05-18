@@ -1,9 +1,11 @@
+import 'package:campus_connect_interface/core/rede/contratos_conteudo.dart';
 import 'package:campus_connect_interface/core/rede/excecao_api.dart';
 import 'package:campus_connect_interface/core/rede/cliente_http_campus.dart';
 import 'package:campus_connect_interface/core/rede/decodificacao_json.dart';
 import 'package:campus_connect_interface/features/oportunidades/domain/repositorio_oportunidades.dart';
 import 'package:campus_connect_interface/features/oportunidades/domain/oportunidade.dart';
 import 'package:campus_connect_interface/features/oportunidades/domain/modalidade_trabalho.dart';
+import 'package:campus_connect_interface/features/oportunidades/domain/requisicao_criar_vaga.dart';
 
 class OpportunitiesRepositoryImpl implements OpportunitiesRepository {
   OpportunitiesRepositoryImpl(this._api);
@@ -27,6 +29,22 @@ class OpportunitiesRepositoryImpl implements OpportunitiesRepository {
           .toList();
     }
     return mapped;
+  }
+
+  @override
+  Future<Opportunity> createOpportunity(CreateOpportunityRequest request) async {
+    final payload = OpportunityPayload(
+      title: request.title,
+      companyName: request.companyName,
+      shortDescription: request.shortDescription,
+      fullDescription: request.fullDescription,
+      applyDeadline: request.applyDeadline,
+      workLocation: request.workLocation.apiValue,
+      typeLabel: request.typeLabel,
+      requirements: request.requirements,
+    );
+    final raw = await _api.createOpportunity(payload);
+    return _mapOpportunity(raw);
   }
 
   @override

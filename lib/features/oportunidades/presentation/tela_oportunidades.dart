@@ -1,8 +1,11 @@
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
+import 'package:campus_connect_interface/core/autorizacao/permissoes_interface.dart';
 import 'package:campus_connect_interface/core/theme/cores_aplicativo.dart';
+import 'package:campus_connect_interface/features/oportunidades/presentation/modal_criar_vaga.dart';
 import 'package:campus_connect_interface/core/util/formatacao_data_portugues.dart';
 import 'package:campus_connect_interface/core/widgets/barra_pesquisa_campus.dart';
 import 'package:campus_connect_interface/core/widgets/cartao_contorno_suave.dart';
+import 'package:campus_connect_interface/core/widgets/snackbar_erro_api.dart';
 import 'package:campus_connect_interface/features/oportunidades/domain/oportunidade.dart';
 import 'package:campus_connect_interface/features/oportunidades/domain/modalidade_trabalho.dart';
 import 'package:flutter/material.dart';
@@ -42,6 +45,15 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
     super.dispose();
   }
 
+  Future<void> _openCreateOpportunity() async {
+    final created = await showCreateOpportunityModal(context);
+    if (created == true && mounted) {
+      await _reload();
+      if (!mounted) return;
+      showFloatingSnackBar(context, 'Vaga publicada com sucesso.');
+    }
+  }
+
   Future<void> _reload() async {
     setState(() => _loading = true);
     try {
@@ -61,8 +73,24 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canCreate = UiPermissions.canManageOpportunities(
+      DependencyScope.of(context).currentUserRole,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: canCreate
+          ? FloatingActionButton.extended(
+              onPressed: _openCreateOpportunity,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Criar vaga',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            )
+          : null,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
