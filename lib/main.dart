@@ -1,12 +1,17 @@
 import 'package:campus_connect_interface/app/roteador_aplicativo.dart';
 import 'package:campus_connect_interface/app/provedor_dependencias.dart';
 import 'package:campus_connect_interface/core/autenticacao/papel_sessao_usuario.dart';
+import 'package:campus_connect_interface/core/configuracao/estrategia_url_web.dart';
 import 'package:campus_connect_interface/core/theme/tema_aplicativo.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    configureWebUrlStrategy();
+  }
   final sessionRole = UserSessionRole();
   final deps = CampusDependencies(sessionRole: sessionRole);
   final router = createAppRouter(sessionRole: sessionRole, deps: deps);

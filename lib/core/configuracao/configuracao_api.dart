@@ -1,4 +1,5 @@
 import 'package:campus_connect_interface/core/rede/contratos_conteudo.dart';
+import 'package:flutter/foundation.dart';
 
 abstract final class ApiConfig {
   static String get baseUrl {
@@ -7,6 +8,16 @@ abstract final class ApiConfig {
       defaultValue: '',
     );
     if (fromEnv.isNotEmpty) return _trimSlash(fromEnv);
+
+    if (kIsWeb) {
+      final page = Uri.base;
+      final host = page.host.toLowerCase();
+      if (host == 'localhost' || host == '127.0.0.1') {
+        return 'http://localhost:8080';
+      }
+      return _trimSlash(page.origin);
+    }
+
     return 'http://localhost:8080';
   }
 
