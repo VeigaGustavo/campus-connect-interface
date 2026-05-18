@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O app precisa acessar suas fotos para você atualizar a imagem do perfil e da capa.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>O app usa a câmera para você tirar uma nova foto de perfil ou de capa.</string>
 </dict>
 </plist>
