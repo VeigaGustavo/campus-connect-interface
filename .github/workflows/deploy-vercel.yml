@@ -40,6 +40,8 @@ jobs:
         run: npm install -g vercel@latest
 
       - name: Build Flutter web
+        env:
+          API_BASE_URL: https://campus.veigagustavo.com.br
         run: bash scripts/build-web.sh
 
       - name: Deploy na Vercel

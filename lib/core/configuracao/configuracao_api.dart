@@ -5,24 +5,25 @@ abstract final class ApiConfig {
   static const productionBaseUrl = 'https://campus.veigagustavo.com.br';
 
   static String get baseUrl {
-    const fromEnv = String.fromEnvironment(
+    const fromBuild = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: '',
+      defaultValue: 'https://campus.veigagustavo.com.br',
     );
-    if (fromEnv.isNotEmpty) return _trimSlash(fromEnv);
+    final configured = _trimSlash(fromBuild);
 
     if (kIsWeb) {
       final host = Uri.base.host.toLowerCase();
-      if (host == 'localhost' || host == '127.0.0.1') {
+      if (kDebugMode && (host == 'localhost' || host == '127.0.0.1')) {
         return 'http://localhost:8080';
       }
-      return productionBaseUrl;
+      return configured;
     }
 
     if (kDebugMode) {
-      return 'http://localhost:8080';
+      const useLocal = bool.fromEnvironment('USE_LOCAL_API', defaultValue: true);
+      if (useLocal) return 'http://localhost:8080';
     }
-    return productionBaseUrl;
+    return configured;
   }
 
   static String _trimSlash(String u) =>
