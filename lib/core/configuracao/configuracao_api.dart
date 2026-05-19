@@ -2,6 +2,8 @@ import 'package:campus_connect_interface/core/rede/contratos_conteudo.dart';
 import 'package:flutter/foundation.dart';
 
 abstract final class ApiConfig {
+  static const productionBaseUrl = 'https://campus.veigagustavo.com.br';
+
   static String get baseUrl {
     const fromEnv = String.fromEnvironment(
       'API_BASE_URL',
@@ -10,15 +12,17 @@ abstract final class ApiConfig {
     if (fromEnv.isNotEmpty) return _trimSlash(fromEnv);
 
     if (kIsWeb) {
-      final page = Uri.base;
-      final host = page.host.toLowerCase();
+      final host = Uri.base.host.toLowerCase();
       if (host == 'localhost' || host == '127.0.0.1') {
         return 'http://localhost:8080';
       }
-      return _trimSlash(page.origin);
+      return productionBaseUrl;
     }
 
-    return 'http://localhost:8080';
+    if (kDebugMode) {
+      return 'http://localhost:8080';
+    }
+    return productionBaseUrl;
   }
 
   static String _trimSlash(String u) =>
